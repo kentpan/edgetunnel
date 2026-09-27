@@ -1,0 +1,62 @@
+# dependencies
+node_modules
+/.pnp
+.pnp.*
+
+# next.js
+/.next/
+/out/
+
+# production build
+/build
+/dist-pages
+/open-next
+/.open-next
+/docs
+/download
+.wrangler
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+dev.log
+server.log
+
+# env files (.env.example 除外)
+.env
+.env*.local
+
+# local databases
+prisma/*.db
+prisma/*.db-journal
+db/
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# vercel
+.vercel
+
+# sandbox specific(仅忽略上游克隆快照; docs/使用教程.md 参与版本管理)
+.claude
+.z-ai-config
+.zscripts
+skills/
+upload/
+docs/edgetunnel/
+tests/
+examples/
+mini-services/
+TODO
+sync-result.json
+dist-pages/
+.open-next/
+.next/
+node_modules/
