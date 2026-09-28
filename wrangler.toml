@@ -14,7 +14,7 @@
 
 name = "autotunnel"
 # Pages 配置: pages_build_output_dir = Nitro cloudflare-pages preset 的产物目录
-pages_build_output_dir = "dist"
+pages_build_output_dir = "dist-pages" # 使用OneNext一定要使用dist-pages
 compatibility_date = "2026-08-01"  # ≥2025-04-01: workerd 开放 node:sqlite(数据层依赖)
 compatibility_flags = ["nodejs_compat"]
 
