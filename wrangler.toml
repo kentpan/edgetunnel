@@ -1,0 +1,29 @@
+# wrangler.toml — avatar-nuxt Cloudflare Pages 部署参考配置(Nuxt 4 + Nitro)
+#
+# ⚠️ 注意: 本文件仅作为本地参考与 `npx wrangler pages deploy dist` 手动部署用。
+# GitHub Actions 部署工作流(.github/workflows/pages-deploy.yml)会按 deploy.config.js
+# 动态重新生成此文件(填入实际 D1 database_id 等), 因此直接修改本文件不影响 CI 部署。
+#
+# 部署链路(Nuxt 原生, 无适配层):
+#   1. NITRO_PRESET=cloudflare-pages npx nuxt build   # 产物 dist/(_worker.js/ + _routes.json + 静态资源)
+#   2. npx wrangler pages dev dist                    # 本地 workerd 预览(真实 Pages 运行时)
+#   3. npx wrangler pages deploy dist                 # 发布为 Pages 项目(需 CLOUDFLARE_API_TOKEN)
+#
+# 运行时数据层: D1 绑定(binding "DB", server/utils/db.ts 自动检测) → d1Orm 轻量 ORM;
+# 本地 Node 环境则走内置 node:sqlite 打开 prisma/avatar-nuxt.db, 与 D1 同一套 SQL 方言。
+
+name = "autotunnel"
+# Pages 配置: pages_build_output_dir = Nitro cloudflare-pages preset 的产物目录
+pages_build_output_dir = "dist"
+compatibility_date = "2026-08-01"  # ≥2025-04-01: workerd 开放 node:sqlite(数据层依赖)
+compatibility_flags = ["nodejs_compat"]
+
+# ==== D1 绑定(部署绑定; CI 自动创建/填入实际 ID 并经 Pages API PATCH 到项目配置) ====
+# 本地手动部署前请先填入真实 database_id(或由 CI 生成):
+# [[d1_databases]]
+# binding = "DB"
+# database_name = "avatar-nuxt"
+# database_id = "<由 wrangler d1 create 返回>"
+
+[vars]
+NODE_ENV = "production"
