@@ -156,10 +156,13 @@ export default {
 writeFileSync(join(DIST, '_worker.js'), workerEntry);
 
 console.log('▶ 生成 _routes.json(静态资源 CDN 直出) ...');
-writeFileSync(
-  join(DIST, '_routes.json'),
-  JSON.stringify({ version: 1, include: '/*', exclude: ['/_next/static/*'] }, null, 2),
-);
+// 结构自检(与 wrangler 校验规则对齐: version=1, include/exclude 均为字符串数组且 include 非空) —— 违规在组装期即报错, 不带病进 wrangler
+const routes = { version: 1, include: ['/*'], exclude: ['/_next/static/*'] };
+if (routes.version !== 1 || !Array.isArray(routes.include) || !routes.include.length || !Array.isArray(routes.exclude)) {
+  console.error('::error::_routes.json 结构非法(version=1; include/exclude 须为字符串数组且 include 非空)');
+  process.exit(1);
+}
+writeFileSync(join(DIST, '_routes.json'), JSON.stringify(routes, null, 2));
 
 console.log('▶ 生成 _headers(基础安全头) ...');
 writeFileSync(
