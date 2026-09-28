@@ -1,174 +1,78 @@
 # ============================================================================
-# sync-upstream.yml — 上游更新自动同步 + 发布工作流(v1.1.0)
+# sync-upstream.yml — 上游同步 + 自动发布
 #
-# 架构约定(重要): 本项目 = 上游仓库(原样保留) + 自研 Next.js 覆盖层 ——
-#   上游文件(_worker.js / CHANGELOG / LICENSE / wrangler.toml / img.png /
-#   上游 .github)在本仓库中**零修改**, 因此 git merge 上游天然无冲突;
-#   仅 README.md / .gitignore 这两个两边都存在的文件可能冲突。
+# 机制(精简: 不走 git merge, 避免把上游 workflows/文档等无关文件带进本仓库),
+# 由 scripts/sync-upstream.mjs 一站式完成:
+#   ① 拉取上游 _worker.js(raw 直连, 失败自动切换 gh-proxy 镜像)
+#   ② sha256 对比 → 有差异覆盖根文件, 无差异零改动
+#   ③ 调 prepare-core.mjs 刷新运行时核心副本(worker-core.mjs / version.gen.ts,
+#      副本内容稳定: 核心未变则不产生 git 变更, 不会误触发发布)
+# 有变更 → commit + push → 以 job 级 uses 调用 pages-deploy.yml 发布
+# (GitHub 仅允许 job 级调用可复用工作流; workflow_call 规避 GITHUB_TOKEN
+# push 事件不触发其他工作流的递归限制)。
 #
-# 职责:
-#   1. 定时检测(每 6 小时) + 手动触发(管理后台"🚀 一键更新发布"按钮 /
-#      Actions 页 workflow_dispatch);
-#   2. git fetch + merge 上游仓库 —— 把上游的全部更新同步过来:
-#      · 冲突自动裁决: 上游文件(_worker.js 等)取上游(ours/theirs 见下),
-#        本项目文件(package.json / deploy.config.js / src/ ...)取本地;
-#   3. scripts/sync-upstream.mjs 兜底: 直连 raw 对比 _worker.js 并刷新
-#      运行时核心副本(worker-core.mjs / version.gen.ts) —— 即使 merge
-#      因历史无关等原因无法进行, 核心也能更新;
-#   4. 有变更 → commit + push, 并直接调用 pages-deploy.yml 发布
-#      (workflow_call 进程内调用, 规避 GITHUB_TOKEN push 事件不触发
-#      其他工作流的递归限制)。
-#
-# 上游来源(优先级): 仓库 Variable UPSTREAM_REPO > deploy.config.js
-#   upstreamRepo > 默认 kentpan/edgetunnel。
+# 上游来源: 仓库 Variable UPSTREAM_REPO > deploy.config.js upstreamRepo >
+#   默认 kentpan/edgetunnel; 分支: Variable UPSTREAM_BRANCH > main。
 # ============================================================================
 
 name: Sync Upstream & Deploy
 
 on:
   schedule:
-    # 每 6 小时一次(分钟值 17 为错峰选择)
     - cron: '17 */6 * * *'
   workflow_dispatch:
     inputs:
       force_deploy:
-        description: '无上游更新也强制部署一次(false/true)'
+        description: '无上游更新也强制部署(false/true)'
         required: false
         default: 'false'
         type: string
 
 permissions:
   contents: write
-  actions: write
+  deployments: write
 
 concurrency:
-  group: sync-upstream-${{ github.ref }}
+  group: sync-upstream
   cancel-in-progress: false
 
 jobs:
   sync:
-    name: Detect & Sync Upstream
+    name: Sync _worker.js from upstream
     runs-on: ubuntu-latest
     outputs:
       updated: ${{ steps.commit.outputs.updated }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          persist-credentials: true
+      - uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Resolve upstream repo
-        id: upstream
-        run: |
-          REPO="${{ vars.UPSTREAM_REPO }}"
-          if [ -z "$REPO" ]; then
-            # 从 deploy.config.js 读取 upstreamRepo(CJS 内动态 import, 兼容无 type:module)
-            REPO=$(node -e "
-              const { pathToFileURL } = require('node:url');
-              (async () => {
-                try {
-                  const m = await import(pathToFileURL('deploy.config.js').href);
-                  console.log((m.default && m.default.upstreamRepo) || '');
-                } catch (e) { console.log(''); }
-              })();
-            " 2>/dev/null || true)
-          fi
-          REPO=$(echo "$REPO" | xargs)
-          REPO=${REPO:-kentpan/edgetunnel}
-          BRANCH="${{ vars.UPSTREAM_BRANCH || 'main' }}"
-          echo "repo=$REPO" >> "$GITHUB_OUTPUT"
-          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
-          echo "✓ 上游仓库: $REPO@$BRANCH"
-
-      - name: Git merge upstream (上游文件取 theirs, 本项目文件取 ours)
-        id: merge
-        run: |
-          set -e
-          git config user.name "autotunnel-sync-bot"
-          git config user.email "actions@github.com"
-          git remote add upstream "https://github.com/${{ steps.upstream.outputs.repo }}.git"
-          git fetch upstream "${{ steps.upstream.outputs.branch }}" --no-tags
-          MERGED=0
-          if git merge "upstream/${{ steps.upstream.outputs.branch }}" --no-edit --allow-unrelated-histories 2>/dev/null; then
-            MERGED=1
-            echo "✓ git merge 上游成功(无冲突)"
-          elif git ls-files -u | grep -q .; then
-            echo "⚠ merge 存在冲突 → 按架构约定自动裁决:"
-            # 逐个冲突文件裁决:
-            #   上游自有文件(上游为准) = theirs; 其余(本项目文件) = ours
-            for f in $(git diff --name-only --diff-filter=U); do
-              case "$f" in
-                _worker.js|CHANGELOG|LICENSE|wrangler.toml|img.png|.github/workflows/sync.yml|.github/workflows/Auto-close-empty-PRs.yml)
-                  git checkout --theirs -- "$f" 2>/dev/null && echo "  ✓ $f ← 上游(theirs)" || git rm -f "$f"
-                  ;;
-                *)
-                  git checkout --ours -- "$f" 2>/dev/null && echo "  ✓ $f ← 本项目(ours)" || git rm -f "$f"
-                  ;;
-              esac
-              git add "$f"
-            done
-            GIT_EDITOR=true git merge --continue 2>/dev/null || git commit --no-edit -m "sync: merge upstream(冲突自动裁决)"
-            MERGED=1
-            echo "✓ 冲突已按策略解决并提交"
-          else
-            echo "⚠ merge 无法进行(无共同历史且无冲突?) → 交由脚本兜底"
-          fi
-          echo "merged=$MERGED" >> "$GITHUB_OUTPUT"
-
-      - name: Verify & refresh runtime core (脚本兜底 + 副本刷新)
+      - name: Sync
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          UPSTREAM_REPO: ${{ steps.upstream.outputs.repo }}
-          UPSTREAM_BRANCH: ${{ steps.upstream.outputs.branch }}
-        run: |
-          # ① 兜底: merge 失败/历史无关时, 直接拉取上游 _worker.js 覆盖根文件
-          # ② merge 成功时: sha 一致则无操作; 同时刷新 worker-core.mjs / version.gen.ts
-          node scripts/sync-upstream.mjs
-          # ③ 架构护栏: 确认本项目关键文件未被上游合并误删
-          MISSING=0
-          for f in package.json deploy.config.js src/app/admin/page.tsx scripts/build-pages-adapter.mjs .github/workflows/pages-deploy.yml; do
-            if [ ! -f "$f" ]; then echo "::error::关键文件缺失: $f"; MISSING=1; fi
-          done
-          exit $MISSING
+          UPSTREAM_REPO: ${{ vars.UPSTREAM_REPO }}
+          UPSTREAM_BRANCH: ${{ vars.UPSTREAM_BRANCH }}
+        run: node scripts/sync-upstream.mjs
 
       - name: Commit & push
         id: commit
         run: |
+          git config user.name "autotunnel-sync-bot"
+          git config user.email "actions@github.com"
           if [ -z "$(git status --porcelain)" ]; then
             echo "updated=false" >> "$GITHUB_OUTPUT"
-            echo "✓ 已是最新, 无需同步"
+            echo "✓ 核心已与上游一致, 无需发布"
           else
             git add -A
-            git commit -m "sync: 同步上游 edgetunnel 更新 ($(date -u +'%Y-%m-%d %H:%M UTC'))" \
-              -m "上游: ${{ steps.upstream.outputs.repo }}@${{ steps.upstream.outputs.branch }}" || true
+            git commit -m "sync: 上游 _worker.js 更新 ($(date -u +'%F %T UTC'))"
             git push
             echo "updated=true" >> "$GITHUB_OUTPUT"
-            echo "✓ 上游更新已同步并推送"
+            echo "✓ 上游更新已推送, 触发发布"
           fi
 
-      - name: Summary
-        run: |
-          {
-            echo "## 上游同步结果"
-            echo "- 上游: \`${{ steps.upstream.outputs.repo }}@${{ steps.upstream.outputs.branch }}\`"
-            echo "- merge: \`${{ steps.merge.outputs.merged }}\`"
-            echo "- 有更新并已推送: \`${{ steps.commit.outputs.updated }}\`"
-            if [ -f sync-result.json ]; then
-              echo '```json'
-              cat sync-result.json
-              echo '```'
-            fi
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Deploy (调用部署工作流发布)
-        if: steps.commit.outputs.updated == 'true' || inputs.force_deploy == 'true'
-        uses: ./.github/workflows/pages-deploy.yml
-        with:
-          project_name: ''
-        secrets: inherit
+  deploy:
+    name: Deploy to Cloudflare
+    needs: sync
+    if: needs.sync.outputs.updated == 'true' || inputs.force_deploy == 'true'
+    uses: ./.github/workflows/pages-deploy.yml
+    with:
+      project_name: ''
+    secrets: inherit

@@ -227,85 +227,22 @@ jobs:
           # node:sqlite 需要 Node≥22.5; CI 构建期用 22 LTS(运行时为 workerd/nodejs_compat)
           node-version: '22'
 
-      - name: Validate required configuration (fail-fast)
+      - name: Verify required secrets
         run: |
-          # ═══════════════════════════════════════════════════════════════
-          # 部署前置校验: 任何必填配置缺失/违规 → 立即终止, 输出详细错误与处理方法
-          #  1) 仓库中不得存在 .env 文件(GitHub 仓库禁止上传 .env, 泄漏即事故)
-          #  2) 必填 Secret: CLOUDFLARE_API_TOKEN / ADMIN_SECRET / JWT_SECRET
-          # ═══════════════════════════════════════════════════════════════
-          FAIL=0
-
-          # ── 1. 检测 .env 文件是否被上传到仓库 ──────────────────────────
-          ENV_TRACKED="$(git ls-files --error-unmatch .env 2>/dev/null || true)"
-          ENV_EXISTS="false"
-          if [ -f .env ]; then ENV_EXISTS="true"; fi
-
-          if [ "$ENV_TRACKED" != "" ] || [ "$ENV_EXISTS" = "true" ]; then
-            echo "::error::检测到 .env 文件已被上传到 GitHub 仓库! GitHub 仓库不允许上传 .env 文件。"
-            echo "::error::.env 包含管理员密码(ADMIN_SECRET)、JWT 密钥等敏感信息, 一旦提交即视为泄漏。"
-            echo "──────────────────────────── 处理方法 ────────────────────────────"
-            echo "  1. 在本地仓库根目录执行以下命令, 从 Git 中移除 .env(保留本地文件):"
-            echo "       git rm --cached .env"
-            echo "  2. 确认 .gitignore 已包含 .env(本项目默认已包含), 然后提交并推送:"
-            echo "       echo '.env' >> .gitignore"
-            echo "       git commit -m 'chore: remove .env from repository' && git push"
-            echo "  3. 【重要】立即在 Cloudflare/GitHub 侧轮换已泄漏的凭据:"
-            echo "       - 修改 GitHub 仓库 Secrets 中的 ADMIN_SECRET / JWT_SECRET / CLOUDFLARE_API_TOKEN"
-            echo "       - 本地 .env 同步更新为相同值"
-            echo "  4. 正确做法: 敏感配置一律放在 GitHub 仓库 Settings → Secrets and variables → Actions,"
-            echo "     .env 仅保留在本地用于本地调试, 永远不要 commit。"
-            echo "──────────────────────────────────────────────────────────────────"
-            FAIL=1
-          else
-            echo "✓ 仓库中未检测到 .env 文件(符合规范)"
-          fi
-
-          # ── 2. 必填 Secret 校验 ────────────────────────────────────────
+          # 必需 secret: CLOUDFLARE_API_TOKEN(部署用) + ADMIN_SECRET / JWT_SECRET(管理后台与 JWT 签名)
           if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
-            echo "::error::缺少必填 Secret: CLOUDFLARE_API_TOKEN (Cloudflare 部署凭据)。"
-            echo "──────────────────────────── 处理方法 ────────────────────────────"
-            echo "  1. 打开 https://dash.cloudflare.com/profile/api-tokens → 创建令牌"
-            echo "  2. 使用 'Cloudflare Pages — Edit' 模板(需包含 Pages:Edit / D1:Edit / KV:Edit / Account Analytics:Read 权限)"
-            echo "  3. GitHub 仓库 → Settings → Secrets and variables → Actions → New repository secret"
-            echo "       Name:  CLOUDFLARE_API_TOKEN"
-            echo "       Value: 粘贴刚才生成的 API Token"
-            echo "──────────────────────────────────────────────────────────────────"
-            FAIL=1
-          fi
-
-          if [ -z "$ADMIN_SECRET" ]; then
-            echo "::error::缺少必填 Secret: ADMIN_SECRET (管理后台登录密码)。"
-            echo "──────────────────────────── 处理方法 ────────────────────────────"
-            echo "  1. GitHub 仓库 → Settings → Secrets and variables → Actions → New repository secret"
-            echo "       Name:  ADMIN_SECRET"
-            echo "       Value: 自定义管理后台密码(建议强密码; 本地 .env 的 ADMIN_SECRET 与其保持一致)"
-            echo "  2. 说明: 该密码同时是 worker 核心的管理员密码(ADMIN), 用于登录 /admin 管理后台"
-            echo "  3. 若使用默认弱密码 admin123, 部署会给出警告, 生产环境请务必修改"
-            echo "──────────────────────────────────────────────────────────────────"
-            FAIL=1
-          elif [ "$ADMIN_SECRET" = "admin123" ]; then
-            echo "::warning::ADMIN_SECRET 当前为默认弱密码 admin123, 生产环境请尽快更换为强密码。"
-          fi
-
-          if [ -z "$JWT_SECRET" ]; then
-            echo "::error::缺少必填 Secret: JWT_SECRET (JWT 签名密钥)。"
-            echo "──────────────────────────── 处理方法 ────────────────────────────"
-            echo "  1. 本地生成随机密钥(任选其一):"
-            echo "       node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\""
-            echo "       openssl rand -hex 32"
-            echo "  2. GitHub 仓库 → Settings → Secrets and variables → Actions → New repository secret"
-            echo "       Name:  JWT_SECRET"
-            echo "       Value: 粘贴生成的随机密钥(本地 .env 的 JWT_SECRET 与其保持一致)"
-            echo "──────────────────────────────────────────────────────────────────"
-            FAIL=1
-          fi
-
-          if [ "$FAIL" = "1" ]; then
-            echo "::error::前置配置校验未通过, 终止部署。请按上方各项'处理方法'修正后重新运行工作流。"
+            echo "::error::Missing CLOUDFLARE_API_TOKEN secret."
             exit 1
           fi
-          echo "✓ 前置配置校验全部通过(.env 未上传 + 三个必填 Secret 均已配置)"
+          if [ -z "$ADMIN_SECRET" ]; then
+            echo "::error::Missing ADMIN_SECRET secret (值应与本地 .env 的 ADMIN_SECRET 一致, 即管理后台密码)。"
+            exit 1
+          fi
+          if [ -z "$JWT_SECRET" ]; then
+            echo "::error::Missing JWT_SECRET secret (值应与本地 .env 的 JWT_SECRET 一致, 即 JWT 签名密钥)。"
+            exit 1
+          fi
+          echo "✓ Required secrets present (CLOUDFLARE_API_TOKEN, ADMIN_SECRET, JWT_SECRET)."
 
       - name: Detect PROXY_MODE (proxy passthrough)
         # v8.9.8: 移除 FRAMEWORK=='next' 门控 —— PROXY_MODE 是配置开关, 决定是否
