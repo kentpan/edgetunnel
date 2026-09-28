@@ -47,7 +47,7 @@ env:
   # 数据库)。数据库文件路径唯一真源 = 仓库 .env 的 DATABASE_URL(由 "Resolve
   # database file from .env" 步骤解析并导出 DATABASE_URL_VALUE, 各步骤引用);
   # 此处静态值仅为 .env 缺失时的最终回落(与 server/utils/db.ts 内置默认一致)
-  DATABASE_URL: "file:./avatar-nuxt.db"
+  DATABASE_URL: "file:./custom.db"
 
 jobs:
   deploy:
@@ -202,12 +202,12 @@ jobs:
           fi
           if [ -z "$DB_URL" ]; then
             # .env 缺失/未配置时回落默认库(与 server/utils/db.ts 内置默认一致)
-            DB_URL="file:./avatar-nuxt.db"
+            DB_URL="file:./custom.db"
             SRC="内置默认(.env 未配置)"
           fi
           # file: 前缀语义: 相对路径按 prisma/ 目录解析(Prisma 惯例) → prisma/<文件名>
           DB_FILENAME=$(echo "$DB_URL" | sed 's/^file://' | awk -F/ '{print $NF}')
-          [ -z "$DB_FILENAME" ] && DB_FILENAME="avatar-nuxt.db"
+          [ -z "$DB_FILENAME" ] && DB_FILENAME="custom.db"
           echo "DATABASE_URL_VALUE=$DB_URL" >> $GITHUB_ENV
           echo "DATABASE_FILENAME=$DB_FILENAME" >> $GITHUB_ENV
           echo "✅ 数据库文件已解析 | 来源: $SRC | DATABASE_URL=$DB_URL | 文件名: $DB_FILENAME"
@@ -1092,6 +1092,12 @@ jobs:
             --project-name "${{ env.PROJECT_NAME }}" \
             --branch main \
             --commit-dirty | tee /tmp/pages-deploy-out.txt
+          # 抓取本次部署 URL(哈希子域, 即刻可访问)供下一步冒烟验证
+          DEPLOY_URL=$(grep -Eo 'https://[a-zA-Z0-9-]+\.[a-zA-Z0-9-]+\.pages\.dev' /tmp/pages-deploy-out.txt | tail -1 || true)
+          # if [ -z "$DEPLOY_URL" ]; then
+          #   echo "::error::未能从 wrangler 输出解析部署 URL, 无法执行 /api 冒烟验证。"
+          #   exit 0
+          # fi
           echo "DEPLOY_URL=$DEPLOY_URL" >> $GITHUB_ENV
           echo "✓ 本次部署 URL: $DEPLOY_URL"
 

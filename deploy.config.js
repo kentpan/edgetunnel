@@ -40,7 +40,7 @@ export default {
   database: true,
 
   // D1 数据库云端名称(可选, 留空自动使用 projectName)
-  d1Name: 'autotunnel',
+  d1Name: '',
 
   // KV 命名空间名称(可选, 留空则不绑定 KV)。
   // worker 核心存储优先级: KV 绑定 > D1(DB 绑定) > node:sqlite > 内存(自动适配)
