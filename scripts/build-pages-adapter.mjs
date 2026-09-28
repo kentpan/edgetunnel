@@ -76,7 +76,7 @@ function resolveCore(mod) {
 const CORE = resolveCore(core);
 
 function isCoreServicePath(url, request, env) {
-  const raw = url.pathname.replace(/^\\\\/+/, '');
+  const raw = url.pathname.replace(/^\\/+/, '');
   const path = raw.toLowerCase();
   if ((request.headers.get('upgrade') || '').toLowerCase() === 'websocket') return true;
   if (path.startsWith('cdn-cgi/')) return true;
@@ -120,7 +120,7 @@ async function resolveDefaultAccountId(token) {
 async function injectDefaultUsageCreds(request, env) {
   try {
     const url = new URL(request.url);
-    if (url.pathname.replace(/^\\\\/+/, '') !== 'admin/getCloudflareUsage') return request;
+    if (url.pathname.replace(/^\\/+/, '') !== 'admin/getCloudflareUsage') return request;
     if (url.searchParams.get('APIToken') || url.searchParams.get('GlobalAPIKey')) return request;
     const envSrc = env || globalThis.__AUTOTUNNEL_CF_ENV__ || {};
     const token = String(envSrc.CLOUDFLARE_API_TOKEN || '').trim();
