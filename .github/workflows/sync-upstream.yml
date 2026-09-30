@@ -1,95 +1,78 @@
 # ============================================================================
-# sync-upstream.yml — 上游更新自动同步 + 发布工作流(v1.0.2)
+# sync-upstream.yml — 上游同步 + 自动发布
 #
-# 职责: 让本项目跟随上游 edgetunnel 零维护更新 ——
-#   1. 定时检测(每 6 小时) + 手动触发(管理后台"🚀 一键更新发布"按钮 /
-#      Actions 页 workflow_dispatch)均走本工作流;
-#   2. scripts/sync-upstream.mjs 拉取上游最新 _worker.js 与前端五页面
-#      (login/admin/noADMIN/noKV/version), 有差异则同步进本项目并重新
-#      生成嵌入模块(worker 核心 / 前端页面任一更新都能被独立检测到);
-#   3. 有变更 → commit + push(同步记录进版本历史);
-#   4. 直接 `uses: ./.github/workflows/pages-deploy.yml`(workflow_call)
-#      完成部署发布 —— 不依赖 push 事件触发, 规避 GITHUB_TOKEN 的
-#      递归触发限制。
+# 机制(精简: 不走 git merge, 避免把上游 workflows/文档等无关文件带进本仓库),
+# 由 scripts/sync-upstream.mjs 一站式完成:
+#   ① 拉取上游 _worker.js(raw 直连, 失败自动切换 gh-proxy 镜像)
+#   ② sha256 对比 → 有差异覆盖根文件, 无差异零改动
+#   ③ 调 prepare-core.mjs 刷新运行时核心副本(worker-core.mjs / version.gen.ts,
+#      副本内容稳定: 核心未变则不产生 git 变更, 不会误触发发布)
+# 有变更 → commit + push → 以 job 级 uses 调用 pages-deploy.yml 发布
+# (GitHub 仅允许 job 级调用可复用工作流; workflow_call 规避 GITHUB_TOKEN
+# push 事件不触发其他工作流的递归限制)。
 #
-# 上游来源: deploy.config.js 的 upstreamRepo(默认 cmliu/edgetunnel),
-#   可用仓库 Variable UPSTREAM_REPO 覆盖。
+# 上游来源: 仓库 Variable UPSTREAM_REPO > deploy.config.js upstreamRepo >
+#   默认 kentpan/edgetunnel; 分支: Variable UPSTREAM_BRANCH > main。
 # ============================================================================
 
 name: Sync Upstream & Deploy
 
 on:
   schedule:
-    # 每 6 小时一次(避开整点高峰, 分钟值 17/37 为任意错峰选择)
     - cron: '17 */6 * * *'
   workflow_dispatch:
     inputs:
       force_deploy:
-        description: '无上游更新也强制部署一次(false/true)'
+        description: '无上游更新也强制部署(false/true)'
         required: false
         default: 'false'
         type: string
 
 permissions:
   contents: write
+  deployments: write
 
 concurrency:
-  group: sync-upstream-${{ github.ref }}
+  group: sync-upstream
   cancel-in-progress: false
 
 jobs:
   sync:
-    name: Detect & Sync Upstream
+    name: Sync _worker.js from upstream
     runs-on: ubuntu-latest
     outputs:
       updated: ${{ steps.commit.outputs.updated }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+      - uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Detect & sync upstream
+      - name: Sync
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # 提高 raw/API 速率限制(可选)
-          UPSTREAM_REPO: ${{ vars.UPSTREAM_REPO }} # 可选覆盖 deploy.config.js
-          UPSTREAM_BRANCH: ${{ vars.UPSTREAM_BRANCH || 'main' }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          UPSTREAM_REPO: ${{ vars.UPSTREAM_REPO }}
+          UPSTREAM_BRANCH: ${{ vars.UPSTREAM_BRANCH }}
         run: node scripts/sync-upstream.mjs
 
       - name: Commit & push
         id: commit
         run: |
+          git config user.name "autotunnel-sync-bot"
+          git config user.email "actions@github.com"
           if [ -z "$(git status --porcelain)" ]; then
             echo "updated=false" >> "$GITHUB_OUTPUT"
-            echo "✓ 已是最新, 无需同步"
+            echo "✓ 核心已与上游一致, 无需发布"
           else
-            git config user.name "autotunnel-sync-bot"
-            git config user.email "actions@github.com"
             git add -A
-            git commit -m "sync: 同步上游 edgetunnel 更新 ($(date -u +'%Y-%m-%d %H:%M UTC')) [skip ci]"
+            git commit -m "sync: 上游 _worker.js 更新 ($(date -u +'%F %T UTC'))"
             git push
             echo "updated=true" >> "$GITHUB_OUTPUT"
-            echo "✓ 上游更新已同步并推送"
+            echo "✓ 上游更新已推送, 触发发布"
           fi
-
-      - name: Summary
-        if: always()
-        run: |
-          {
-            echo "### 上游同步结果"
-            echo '```json'
-            cat sync-result.json 2>/dev/null || echo '{}'
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
 
   deploy:
     name: Deploy to Cloudflare
     needs: sync
     if: needs.sync.outputs.updated == 'true' || inputs.force_deploy == 'true'
     uses: ./.github/workflows/pages-deploy.yml
+    with:
+      project_name: ''
     secrets: inherit
