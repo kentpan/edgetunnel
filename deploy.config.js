@@ -40,7 +40,7 @@ export default {
   database: true,
 
   // D1 数据库云端名称(可选, 留空自动使用 projectName)
-  d1Name: '',
+  d1Name: 'autotunnel',
 
   // KV 命名空间名称(可选, 留空则不绑定 KV)。
   // worker 核心存储优先级: KV 绑定 > D1(DB 绑定) > node:sqlite > 内存(自动适配)
@@ -57,13 +57,13 @@ export default {
   // 探测优先级: CLOUDFLARE_ACCOUNT_ID secret > 此 accountId > 自动用 API Token 探测
   accountId: '',
 
-  // v1.1.0 上游同步来源(仓库 Variable UPSTREAM_REPO 可覆盖此值):
-  //   sync-upstream.yml 定时(每 6h)/手动(管理后台"一键更新发布")先 git merge
-  //   该仓库(上游文件取上游、本项目文件取本地), 再经 sync-upstream.mjs 刷新
-  //   核心副本 —— 原项目更新(核心/任意文件)零维护跟随, 并自动调用部署发布。
-  //   kentpan/edgetunnel 为本项目 git clone 的上游; cmliu/edgetunnel 为原始
-  //   项目; 如需跟随其他仓库, 改成 'owner/repo' 即可。
-  upstreamRepo: 'kentpan/edgetunnel',
+  // v1.0.2 上游同步来源(仓库 Variable UPSTREAM_REPO 可覆盖此值):
+  //   sync-upstream.yml 定时(每 6h)/手动(管理后台"一键更新发布")从该仓库
+  //   拉取最新 _worker.js 与前端五页面, 有更新自动同步进本项目并直接调用
+  //   部署工作流发布 —— 原项目更新(含前端样式/功能)零维护跟随。
+  //   kentpan/edgetunnel 为 fork 快照, cmliu/edgetunnel 为活跃上游;
+  //   如需跟随其他 fork, 改成 'owner/repo' 即可。
+  upstreamRepo: 'cmliu/edgetunnel',
 }
 
 // GitHub Actions 所需 secrets(在仓库 Settings → Secrets and variables → Actions 配置):

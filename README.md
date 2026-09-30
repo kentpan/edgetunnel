@@ -1,10 +1,10 @@
 <div align="center">
 
-# 🚇 AutoTunnel
+# 🚇 Autotunnel
 
-**多协议节点部署 · 订阅生成 · 一键管理**
+**基于 Next.js 重构的 edgetunnel —— 前端原样复刻 · worker 服务端核心保持原版**
 
-默认 Cloudflare Pages 部署 · 支持 **Node.js + node:sqlite** 与 **Cloudflare Pages + KV/D1** 双运行时
+默认 Cloudflare Pages 部署 · 自动适配 **Node.js + node:sqlite** 与 **Cloudflare Pages + KV/D1**
 
 </div>
 
@@ -23,156 +23,190 @@
 
 ## 📖 项目简介
 
-AutoTunnel 基于 [edgetunnel](https://github.com/cmliu/edgetunnel)（原作者 cmliu），核心仓库为 [kentpan/edgetunnel](https://github.com/kentpan/edgetunnel)，本仓库（[kentpan/autotunnel](https://github.com/kentpan/autotunnel)）是部署增强版：
+Autotunnel 是对 [kentpan/edgetunnel](https://github.com/kentpan/edgetunnel)（源自 [cmliu/edgetunnel](https://github.com/cmliu/edgetunnel)）的重构版本。
 
-> **一句话**：用一个免费的 Cloudflare 账号搭建属于你自己的 VLESS/Trojan/SS 代理节点，
-> 网页上点鼠标即可生成/管理订阅链接，客户端订阅即用。
+原项目将全部逻辑(约 6600+ 行)集中在单个 `_worker.js` 中, 前端页面托管于外部静态站(`edt-pages.github.io`)。本项目将其重构为 **Next.js 16 App Router** 工程:
 
-### v1.1.5 功能特性
-
-| 功能 | 说明 |
+| 组成 | 说明 |
 |---|---|
-| 🌍 **网络信息与延迟测试** | 概览页"当前网络信息"模块（国内测试 / 国外测试 / CloudFlare 双出口 / 墙外测试多源切换，IP 隐私打码 + 点击查看归属地详情含滥用评分与风险徽章），8 站点延迟测试（去极值均值、阈值分色） |
-| 📊 **管理后台** | 6 大模块（概览 / 订阅生成 / 节点与反代 / 通知与统计 / 操作日志 / 关于）：订阅链接四格式复制 + 二维码、优选工具三件套、订阅转换配置 UI、协议/传输/ECH/指纹/ALPN 全字段表单、五协议反代、小白/高手双模式 |
-| 🔍 **代理列表探索** | 获取更多 ProxyIP（多选最多 8 个 + 逐项验证）、探索 SOCKS5/HTTP/HTTPS 公共列表（地区分组 + 可用性验证后填入） |
-| 🛡️ **通知与统计** | Telegram 通知（getMe + sendMessage 双 API 验证后才可保存）、CF 用量四方案（部署默认凭据零配置 / APIToken+AccountID / Email+Key / 自定义 UsageAPI），凭据均不回显 |
-| 🌗 **日间/夜间模式** | 全站默认**日间模式**，右上角一键切换夜间模式并记忆偏好；两种模式均按高对比度标准调校文案 |
-| 🔌 **自动适配** | 运行时自动识别环境，存储链：**KV 绑定 → D1 绑定(DB) → node:sqlite → 内存** |
-| 🛡️ **部署前配置校验** | GitHub Actions 部署前逐项校验必填配置（deploy.config.js / .env / CLOUDFLARE_API_TOKEN / ADMIN_SECRET / JWT_SECRET），检测到 .env 上传仓库同样直接终止，任何一项不通过都会在日志输出详细错误与逐条处理方法 |
-| 🔄 **零维护同步** | `sync-upstream.yml` 每 6 小时自动同步上游 + sha256 兜底校验，有更新自动构建发布；管理后台"🚀 一键更新发布"按钮可随时手动触发 |
-| 🚀 **部署两件套** | `deploy.config.js` + `.github/workflows/pages-deploy.yml`，默认 **pages** 方式发布（KV/D1 自动创建绑定），支持 `deployType: pages \| workers` |
+| 🎨 **前端页面** | 自原项目使用的静态站**原样提取**, 以 base64 内嵌模块实现**字节级复刻**(login / admin / noADMIN / noKV / version), 经 Next.js 路由原路径返回 |
+| ⚙️ **worker 服务端核心** | **完全保持不变** —— `worker/_worker.js` 与原仓库字节一致(MD5 校验), VLESS/Trojan、WS/gRPC/XHTTP、订阅生成、管理 API、日志记录等全部为原版服务 |
+| 🔌 **自动适配层** | 运行时自动识别环境, 存储链: **KV 绑定 → D1 绑定(DB) → node:sqlite → 内存**; 平台垫片仅补齐 workerd 语义(MD5 / fetcher.connect / WebSocketPair / request.cf), 核心零改动 |
+| 🚀 **部署两件套** | `deploy.config.js` + `.github/workflows/pages-deploy.yml`, 默认 **pages** 方式发布, 支持 `deployType: pages \| workers` 与 `DEPLOYTYPE` 仓库变量覆盖 |
+| 📊 **CF 用量统计** | 管理后台"请求统计"默认使用部署时配置的 `CLOUDFLARE_API_TOKEN`(GitHub Actions Secrets 自动注入), 无需手动填凭据; Node 环境经 Cloudflare API 查询真实用量, 亦可选用 UsageAPI/Email+Key 自定义方案 |
 
-## ✨ 面板功能清单
+## ✨ 特性
 
-- 概览：基本信息、Workers/Pages 双色分段用量条 + 每日重置倒计时、当前网络信息、8 站点延迟测试、订阅链接（通用/Base64/Clash/SingBox + 节点链接）复制与二维码、安全检测
-- 订阅生成：三种优选模式（随机/自定义/生成器）、随机数量 1~99、指定端口（含 SS 无 TLS 明文端口映射）、开始优选（在线优选工具/本地优选工具目录/在线优选域名）、订阅接口汇聚、链式代理、订阅转换配置（SUBAPI/SUBCONFIG + 8 开关联动）
-- 节点与反代：SUBNAME/HOSTS/UUID/PATH、协议（VLESS/Trojan/SS）、传输（WS/XHTTP/gRPC）、指纹（含 ECH 冲突三选一处理）、ALPN、跳过证书验证、随机路径、0-RTT、TLS 分片、ECH（DNS/SNI 预设 + 自定义）、PROXYIP（输入清洗 + 自动获取）、五协议其他代理（含检测、地区/延迟展示）、路径模板（含预设一键填充）、高级 JSON 兜底
-- 通知与统计：TG（验证门控 + 清除）、CF 统计四方案（验证门控 + 清除）
-- 操作日志：7 列表格（UTC+8 时间/IP/地区/ASN/操作/URL/UA）、彩色操作类型、Get_SUB 按 UA 细分订阅转换、分页加载 + 全量弹窗、10s 自动刷新
-- 关于：版本信息（含上游健康徽章）、上游检测、一键更新发布、更新日志、重置配置
+- **前端原样复刻**: 页面字节级一致, 管理面板全部功能(节点链接/优选IP/TG通知/CF用量/代理检测/测速等)原样可用
+- **核心零改动**: `worker/_worker.js` 逐字节保留, 可随时独立部署回 Cloudflare 高级模式
+- **双模式运行**:
+  - ☁️ **Cloudflare Pages(默认)**: OpenNext 编译前端 + 原版核心混编 `dist-pages/_worker.js`, KV/D1 绑定自动注入
+  - 🟢 **Node.js 独立服务**: `server/node-server.mjs` 单端口承载 Next.js + WebSocket 升级, 数据落 `node:sqlite`
+- **配置唯一真源**: 本地/Node 模式全部配置收敛于 `.env`(含 `ADMIN_SECRET`/`DATABASE_URL`), CI 经 GitHub Secrets 自动注入线上
+- **管理密码改名**: 原项目 `ADMIN` 变量统一为 `ADMIN_SECRET`(向下兼容旧名)
+- **v1.0.1**:
+  - 📊 Cloudflare Workers/Pages 可用请求数统计默认走部署凭据 —— 管理后台新增"🚀 部署默认凭据(CLOUDFLARE_API_TOKEN)"方案并设为默认; workflow 自动把部署 Token 注入 Pages env_vars, Node 模式从 `.env`/环境变量读取; 内置 `/autotunnel/cf-usage` 统计端点(Cloudflare GraphQL 同款查询, 60s 缓存), 核心 `cf.json` 的 UsageAPI 指向它即得真实用量
+  - ▼ 管理后台全部下拉框新增三角箭头与展开切换动画(双层 SVG 交叉滑动, 明暗主题自适应)
+- **v1.0.2 新增 —— 零维护自动跟随上游**:
+  - 🔄 **上游同步工作流**(`.github/workflows/sync-upstream.yml`): 每 6 小时定时检测上游 `_worker.js` 与前端五页面(login/admin/noADMIN/noKV/version), 任一有更新(含原项目**前端样式/功能**更新)自动同步进本项目 → commit → 直接调用部署工作流发布, 全程无人值守
+  - 🚀 **管理后台"一键更新发布"**: 版本弹窗一键触发同步+发布(workflow_dispatch), 免去手动跑 Actions; Pages 部署自动注入触发凭据, Node 部署在 `.env` 配 PAT 即可
+  - 🔗 **面板作者链接可配置**: `.env`/仓库 Variable 配置 `OWNER_GITHUB` / `OWNER_TG`, 管理面板左下角 GitHub/Telegram 入口展示为部署者自己的主页(留空保持原版)
+  - 📚 **喋饭级使用教程**: [docs/使用教程.md](docs/使用教程.md) —— 项目作用/适用人群/三种部署/全功能说明/FAQ
 
 ## 🚀 快速开始
 
-> 📚 **完整喂饭级教程见 [docs/使用教程.md](docs/使用教程.md)** —— 从"这是什么"到"手机翻出去"全程手把手。
-
-### 方式一：GitHub Actions 自动部署到 Cloudflare Pages（推荐）
+### 本地开发(沙盒/Node ≥22.5)
 
 ```bash
-# 1. 克隆核心仓库(或直接 clone 本仓库)
-git clone https://github.com/kentpan/edgetunnel autotunnel && cd autotunnel
-
-# 2. 将本项目发布包(autotunnel-v1.1.5.zip)解压覆盖到当前目录
-
-# 3. 推送到你自己的仓库(如 kentpan/autotunnel)
-git init -b main 2>/dev/null; git add -A; git commit -m "feat: autotunnel v1.1.5"
-git remote add origin https://github.com/<你的用户名>/autotunnel.git
-git push -u origin main
+npm install
+npm run dev          # http://localhost:3000
 ```
 
-4. 仓库 **Settings → Secrets and variables → Actions** 配置（缺失时部署会在校验步骤直接终止并在日志告诉你怎么补）：
+- 管理面板: `/login` → 输入 `.env` 中 `ADMIN_SECRET` 的值
+- 数据库: `.env` 的 `DATABASE_URL`(`file:./avatar-nuxt.db` → `prisma/avatar-nuxt.db`)
 
-   | 类型 | 名称 | 说明 |
-   |---|---|---|
-   | Secret | `CLOUDFLARE_API_TOKEN` | 权限：Pages:Edit + D1:Edit + KV:Edit + Account Analytics:Read |
-   | Secret | `ADMIN_SECRET` | 管理后台登录密码（必填，请勿使用默认值 admin123） |
-   | Secret | `JWT_SECRET` | 随机长字符串（`openssl rand -hex 16` 生成） |
-   | Variable | `OWNER_GITHUB` / `OWNER_TG` | 可选，面板"联系维护者"链接 |
-5. push 到 `main` 自动触发部署 → Pages 项目自动创建（KV/D1 自动绑定）→ 用 `*.pages.dev` 域名访问
-6. 登录管理后台 → 生成订阅 → 客户端导入，完成 🎉
-
-> ⚠️ **注意**：GitHub 仓库**禁止上传 `.env` 文件**（部署工作流会检测并终止），请使用 GitHub Secrets；本地部署请参考 `.env.example`。
-
-### 方式二：Node.js 独立部署（VPS）
+### Node.js 生产模式(nodejs + node:sqlite)
 
 ```bash
-npm install          # Node.js 18+（推荐 22+）
-cp .env.example .env # 编辑 ADMIN_SECRET / JWT_SECRET / DATABASE_URL(留空 ADMIN_SECRET 则默认密码 admin123)
 npm run build
-npm start            # server/node-server.mjs: Next.js + WS + node:sqlite, 单进程单端口
+PORT=3000 npm run serve:node   # 单端口: Next.js + WS 代理 + node:sqlite
 ```
 
-### 方式三：本地开发
+### Cloudflare Pages(默认, 推荐)
 
-```bash
-npm install && npm run dev   # http://localhost:3000
+1. Fork 本仓库
+2. 仓库 Settings → Secrets and variables → Actions 配置:
+
+   | Secrets | 说明 |
+   |---|---|
+   | `CLOUDFLARE_API_TOKEN` | 部署权限(Pages:Edit + D1:Edit + KV:Edit) |
+   | `ADMIN_SECRET` | 管理后台密码(自动注入 Pages env_vars) |
+   | `JWT_SECRET` | 签名密钥(自动注入) |
+
+3. 推送到 `main` 分支(或手动触发 workflow) → 自动完成:
+   创建/复用 D1 + KV → 推送 `server/schema.sql` / `server/seed.sql` → OpenNext 构建 →
+   混编适配层组装(`scripts/build-pages-adapter.mjs`) → `wrangler pages deploy dist-pages`
+
+> 💡 可选变量: `DEPLOYTYPE=workers` 切换 Workers 部署; `deploy.config.js` 调整项目名/D1/KV。
+
+## ⚙️ 配置说明(.env)
+
+```ini
+ADMIN_SECRET=你的管理密码        # 必填: 管理后台密码(原 ADMIN)
+JWT_SECRET=随机密钥              # 必填: 签名密钥
+DATABASE_URL="file:./avatar-nuxt.db"  # 存储文件唯一真源(Node 模式)
+
+# ---- 以下为核心可选变量(部署时自动注入, 全部可留空) ----
+# KEY=      快速订阅路径 + 加密秘钥
+# UUID=     固定节点 UUID(v4)
+# HOST=     额外域名(逗号分隔)
+# PROXYIP=  反代 IP
+# BEST_SUB= 1 开启优选订阅生成器
+# URL=      伪装页(nginx / 1101 / https://...)
+# GO= DEBUG= OFF_LOG= TCP_CONCURRENT_DIAL= PROXY_CONCURRENT_DIAL= PRELOAD_RACE_DIAL=
+# WS_PATH=  传输路径(映射核心 PATH 变量, 避免与系统 PATH 冲突)
 ```
 
-## 🔄 上游同步（零维护跟随）
+Cloudflare 线上: `ADMIN_SECRET`/`JWT_SECRET`/`CLOUDFLARE_API_TOKEN`/`CLOUDFLARE_ACCOUNT_ID`
+由工作流自动注入; 其余可选变量在 **Pages 项目 → Settings → Environment variables**
+添加同名键即可(运行时自动合并)。
+
+> 📊 **CF 用量统计默认凭据**: workflow 会把部署用的 `CLOUDFLARE_API_TOKEN`
+> (需含 **Account Analytics: Read** 权限)与 `CLOUDFLARE_ACCOUNT_ID` 一并注入运行时,
+> 管理后台"请求统计"开箱即用; 无需再手动填 Email/API Key。
+> Node.js 模式在 `.env` 配置同名变量即可达到同样效果。
+
+### 🔄 自动同步更新(v1.0.2)
+
+上游(edgetunnel)更新后本项目可**零维护跟随** —— 核心与前端都能同步:
 
 ```
-上游 edgetunnel 更新(_worker.js / 任意文件)
+上游 cmliu/edgetunnel 更新(_worker.js 或前端页面)
         │
         ▼
-sync-upstream.yml(每 6h 定时 / 管理后台"🚀 一键更新发布"手动)
-  ① git merge 上游 —— 上游文件在本仓库零修改, 天然无冲突
-     (万一 README.md/.gitignore 冲突: 上游文件取上游, 本项目文件取本地)
-  ② scripts/sync-upstream.mjs 兜底: raw sha256 对比根 _worker.js + 刷新核心副本
-  ③ 有变更 → push → 自动调用 pages-deploy.yml 构建发布(先过配置校验)
+① 定时: sync-upstream.yml 每 6h 自动运行
+   手动: 管理后台版本弹窗"🚀 一键更新发布"(或 Actions 页手动触发)
         │
         ▼
-线上核心已更新, 你的面板与配置不受影响
+② scripts/sync-upstream.mjs: 对比 _worker.js(sha256) + 抓取前端五页面
+   有差异 → 覆盖 worker/_worker.js + worker-core.mjs + src/lib/pages/*
+        │
+        ▼
+③ 重新生成嵌入模块(scripts/embed-pages.mjs, 自动重新应用本项目
+   的全部前端定制: 一键更新发布按钮/下拉箭头动画/统计默认方案)
+        │
+        ▼
+④ commit + push → 直接调用 pages-deploy.yml(workflow_call)发布上线
 ```
 
-## 🧭 目录结构
+- 上游来源: `deploy.config.js` 的 `upstreamRepo`(默认 `cmliu/edgetunnel`), 仓库 Variable `UPSTREAM_REPO` 可覆盖
+- "一键更新发布"凭据: Pages 部署自动注入(缺省回落 Actions `GITHUB_TOKEN`);
+  Node 部署在 `.env` 配 `AUTOSYNC_TOKEN`(GitHub PAT, 需 **Actions: write**)+ `GITHUB_REPOSITORY(owner/repo)`
+
+## 🗂 目录结构
 
 ```
 autotunnel/
-├── _worker.js                  # 核心服务(git 同步上游即更新)
-├── deploy.config.js            # 部署配置唯一来源(项目名/KV/D1/上游仓库)
-├── package.json                # npm 工程(v1.1.5)
-├── .env / .env.example         # 配置唯一数据源(.env-wins 语义)
-├── .github/workflows/
-│   ├── pages-deploy.yml        # Pages 自动部署(配置校验+构建+KV/D1+发布)
-│   └── sync-upstream.yml       # 上游检测→git merge→自动发布(6h/一键)
+├── src/app/                    # Next.js 前端(含字节级复刻页面路由)
+│   ├── page.tsx                # 落地页
+│   ├── login/ admin/           # 复刻页面(鉴权决策委托核心)
+│   ├── admin/[path]/ sub/ logout/ locations/ robots.txt/ [uuid]/ [...fallback]
+│   └── api/health/             # 运行状态自检
+├── src/lib/
+│   ├── core/worker-core.mjs    # ★ 原版核心(与 worker/_worker.js 字节一致)
+│   ├── pages/                  # 提取的原始页面 + base64 内嵌模块
+│   └── adapter/                # 自动适配层(env/存储/shims/核心调用/CF用量统计)
+├── worker/_worker.js           # ★ 原版核心原文(CF 独立部署用)
+├── server/
+│   ├── node-server.mjs         # Node 独立运行模式
+│   ├── schema.sql / seed.sql   # D1 建表/种子(CI 自动推送)
 ├── scripts/
-│   ├── prepare-core.mjs        # 根 _worker.js → 运行时副本 + 版本指纹
-│   ├── sync-upstream.mjs       # 上游 sha256 对比 + 副本刷新(兜底)
-│   └── build-pages-adapter.mjs # CF Pages 混编装配
-├── src/
-│   ├── app/                    # 页面与 API 路由
-│   │   ├── page.tsx            #   首页(免责声明/求 Star)
-│   │   ├── login/              #   登录页
-│   │   ├── admin/              #   管理后台(6 大模块)
-│   │   ├── noADMIN/ noKV/      #   配置错误提示页
-│   │   ├── sub/ version/ ...   #   核心服务转发
-│   │   └── autotunnel/         #   项目扩展端点(cf-usage/trigger-sync/upstream-check)
-│   ├── components/admin/       # 管理后台组件(日/夜双主题)
-│   └── lib/
-│       ├── core/               # worker-core.mjs(运行时副本, 自动生成)
-│       └── adapter/            # 存储适配/垫片/核心调用中枢
-├── server/node-server.mjs      # Node 独立服务入口(WS 升级+Next 生产)
-├── prisma/schema.prisma        # SQLite(DATABASE_URL 唯一真源)
-└── docs/使用教程.md            # ★ 喂饭级完整教程
+│   ├── build-pages-adapter.mjs # dist-pages 混编适配层组装
+│   ├── embed-pages.mjs         # 页面内嵌模块生成器(含编译期定制 patch)
+│   ├── patch-admin.mjs         # 管理面板编译期定制(一键更新/箭头动画/统计方案)
+│   └── sync-upstream.mjs       # 上游更新检测与同步
+├── docs/
+│   └── 使用教程.md             # 喋饭级完整使用教程
+├── deploy.config.js            # 部署配置唯一来源(项目名/D1/KV/upstreamRepo)
+└── .github/workflows/
+    ├── pages-deploy.yml        # 部署工作流(默认 pages)
+    └── sync-upstream.yml       # 上游同步工作流(定时+一键触发)
 ```
 
-## 🔐 安全提示
+## 🧩 运行时自动适配矩阵
 
-- `ADMIN_SECRET` 留空时本地默认密码为 `admin123`，**公网部署务必改为强密码**（Actions 部署时必须显式配置）；
-- 订阅链接含 token（由部署密钥派生），**请勿泄露**，泄露后可在管理后台重置配置重新派生；
-- 登录 cookie 与浏览器 User-Agent 绑定（核心安全设计），24 小时后需重新登录；
-- `.env` 不入版本库（已在 .gitignore），仓库部署统一走 GitHub Secrets；
-- 面板中的 BotToken / APIToken 等敏感凭据不回显（服务端仅返回掩码），更换凭据需重新验证后保存。
+| 能力 | Cloudflare Pages | Node.js 独立服务 |
+|---|---|---|
+| 前端页面 | OpenNext(复刻页面路由) | Next.js 生产服务 |
+| 管理面板/订阅/日志 | ✅ 原版核心 | ✅ 原版核心 |
+| WS/TCP 代理协议 | ✅ workerd 原生 | ✅ ws + node:net/tls 垫片 |
+| 存储 | KV 绑定 → D1(DB) → node:sqlite → 内存 | node:sqlite → 内存 |
+| 管理密码 | `ADMIN_SECRET`(Pages env_vars 自动注入) | `.env` ADMIN_SECRET |
 
-## 💙 致谢 & 求星
+## 🙏 致谢与声明
 
-特别感谢原作者 [cmliu/edgetunnel](https://github.com/cmliu/edgetunnel) ——
-本项目核心来自其优秀成果（核心仓库 [kentpan/edgetunnel](https://github.com/kentpan/edgetunnel)）。
+- 本项目基于 **[cmliu/edgetunnel](https://github.com/cmliu/edgetunnel)** 的优秀成果重构, 并感谢 **[kentpan/edgetunnel](https://github.com/kentpan/edgetunnel)** 的 fork 维护 —— 服务端核心版权归原项目所有, 本项目遵循相同协议(GPL-2.0)开源。
+- 前端页面提取自原项目使用的 `edt-pages.github.io` 静态站, 仅作工程化整合与少量 UX 增强(下拉框箭头/动画), 页面内容版权同样归原项目。
 
-如果 AutoTunnel 对你有帮助，欢迎给 [kentpan/autotunnel](https://github.com/kentpan/autotunnel) 点一个 Star ⭐ ——
-这是我持续维护（Cloudflare / Node 双运行时、KV/D1 自动切换、上游自动同步、日/夜双主题）的最大动力！
-
-## 📄 许可证
-
-[GPL-2.0](LICENSE)（与原项目一致）。使用本项目即表示你已阅读并同意[免责声明](#-免责声明--disclaimer)。
-
----
-
-> **再次提醒**：本项目仅供学习交流与个人合法测试，请遵守所在地法律法规，勿用于任何非法用途，下载后 24 小时内请自行删除。
-
----
+## ⭐ 求个 Star!
 
 <div align="center">
 
-**Author: [kentpan](https://github.com/kentpan)** · 基于 cmliu/edgetunnel · GPL-2.0
+**如果 Autotunnel 帮到了你, 请给项目一个 ⭐ Star!**
+
+你的 Star 是我们持续维护适配(双运行时 / KV-D1 自动切换 / 跟进上游核心更新)的最大动力!
+也欢迎提交 Issue 与 PR —— 让这个项目变得更好用!
+
+**Fork → Star → Deploy**, 三连支持一下! 🎉
 
 </div>
+
+## 📄 许可证
+
+本项目采用 [GPL-2.0](./LICENSE) 协议开源 —— 与原项目保持一致。
+
+---
+
+## ⚠️ 再次提醒
+
+本项目仅供学习交流与技术研究使用, 请务必遵守所在地法律法规。下载后请于 24 小时内自行删除, 使用本项目产生的一切后果由使用者自行承担。

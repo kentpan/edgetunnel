@@ -44,19 +44,14 @@ next-env.d.ts
 # vercel
 .vercel
 
-# sandbox specific(仅忽略上游克隆快照; docs/使用教程.md 参与版本管理)
+# sandbox specific
 .claude
 .z-ai-config
 .zscripts
 skills/
 upload/
-docs/edgetunnel/
+docs/
 tests/
 examples/
 mini-services/
 TODO
-sync-result.json
-dist-pages/
-.open-next/
-.next/
-node_modules/

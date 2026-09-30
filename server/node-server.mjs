@@ -280,10 +280,8 @@ function buildCoreEnv(kv) {
     }
     return undefined;
   };
-  // v1.1.1: ADMIN_SECRET 留空/未配置时回落默认密码 admin123(用户约定,
-  // 生产环境务必通过 .env / 环境变量覆盖)
-  const admin = pick('ADMIN_SECRET', 'ADMIN', 'PASSWORD', 'PSWD', 'TOKEN') || 'admin123';
-  env['ADMIN'] = admin;
+  const admin = pick('ADMIN_SECRET', 'ADMIN', 'PASSWORD', 'PSWD', 'TOKEN');
+  if (admin !== undefined) env['ADMIN'] = admin;
   for (const k of ['KEY', 'UUID', 'HOST', 'PROXYIP', 'BEST_SUB', 'URL', 'GO', 'DEBUG', 'OFF_LOG', 'TCP_CONCURRENT_DIAL', 'PROXY_CONCURRENT_DIAL', 'PRELOAD_RACE_DIAL']) {
     const v = pick(k);
     if (v !== undefined) env[k] = v;

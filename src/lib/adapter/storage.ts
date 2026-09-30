@@ -132,6 +132,7 @@ let sqliteInstance: SqliteKV | null | undefined;
  * (bun:sqlite / @opennextjs/cloudflare 等), 避免构建期解析失败。
  */
 function runtimeImport(spec: string): Promise<unknown> {
+  // eslint-disable-next-line no-new-func
   const dynamicImport = new Function('s', 'return import(s)') as (
     s: string,
   ) => Promise<unknown>;

@@ -21,8 +21,8 @@ import {
   placeholderCf,
 } from './node-shims';
 
-// 字节一致的核心模块(构建期由 scripts/prepare-core.mjs 从根 _worker.js 字节复制,
-// 上游同步后经 prepare/sync 脚本自动刷新 —— 运行时永远与根文件保持一致)
+// 字节一致的核心模块(内容与 docs/edgetunnel/_worker.js 完全相同)
+// @ts-expect-error — 无类型声明的 ESM 模块(逐字保留原文件)
 import coreModule from '@/lib/core/worker-core.mjs';
 
 interface CoreFetcher {
@@ -52,11 +52,9 @@ export async function buildCoreEnv(): Promise<{
     }
     return undefined;
   };
-  // 管理员密码: 原项目 ADMIN 系列变量统一由 ADMIN_SECRET 提供(向下兼容旧名)。
-  // v1.1.1: ADMIN_SECRET 留空/未配置时回落默认密码 admin123(用户约定:
-  // 默认密码留空或 admin123; 生产环境务必通过 .env / 环境变量覆盖)。
-  const admin = pick('ADMIN_SECRET', 'ADMIN', 'PASSWORD', 'PSWD', 'TOKEN') ?? 'admin123';
-  env['ADMIN'] = admin;
+  // 管理员密码: 原项目 ADMIN 系列变量统一由 ADMIN_SECRET 提供(向下兼容旧名)
+  const admin = pick('ADMIN_SECRET', 'ADMIN', 'PASSWORD', 'PSWD', 'TOKEN');
+  if (admin !== undefined) env['ADMIN'] = admin;
   // 其余可选配置(.env.example 有完整说明)
   for (const k of ['KEY', 'UUID', 'HOST', 'PROXYIP', 'BEST_SUB', 'URL', 'GO', 'DEBUG', 'OFF_LOG', 'TCP_CONCURRENT_DIAL', 'PROXY_CONCURRENT_DIAL', 'PRELOAD_RACE_DIAL']) {
     const v = pick(k);
@@ -111,8 +109,8 @@ async function prepareCoreRequest(request: Request): Promise<Request> {
     md5Ready = true;
   }
   // workerd 原生请求(cf/fetcher 天然存在) → 原样直通
-  const asAny = request as unknown as { cf?: unknown; fetcher?: { connect?: unknown } };
-  if (isWorkerdRequest(request) && typeof asAny.fetcher?.connect === 'function') {
+  const asAny = request as unknown as { cf?: unknown; fetcher?: unknown };
+  if (isWorkerdRequest(request) && asAny.fetcher && typeof asAny.fetcher.connect === 'function') {
     return request;
   }
   // Node 模式: 重建请求并注入平台垫片

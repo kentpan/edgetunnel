@@ -44,10 +44,7 @@ const eslintConfig = [...nextCoreWebVitals, ...nextTypescript, {
     "no-useless-escape": "off",
   },
 }, {
-  ignores: ["node_modules/**", ".next/**", "out/**", "build/**", "next-env.d.ts", "examples/**", "skills",
-    // v1.1.0: 上游原样核心与其构建副本/文档快照不参与 lint(保持字节一致)
-    "_worker.js", "docs/edgetunnel/**", "docs/pages-deploy.yml",
-    "src/lib/core/worker-core.mjs", "src/lib/core/version.gen.ts", "dist-pages/**", ".open-next/**"]
+  ignores: ["node_modules/**", ".next/**", "out/**", "build/**", "next-env.d.ts", "examples/**", "skills"]
 }];
 
 export default eslintConfig;

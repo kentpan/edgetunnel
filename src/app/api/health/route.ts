@@ -1,14 +1,11 @@
 /**
- * /api/health — 运行时自检(落地页/管理后台状态展示用)
+ * /api/health — 运行时自检(落地页状态展示用)
  */
 import { NextResponse } from 'next/server';
 import { resolveKV, currentKVDriver } from '@/lib/adapter/storage';
 import { buildCoreEnv, isCoreServicePath } from '@/lib/adapter/invoke-core';
-import { CORE_VERSION } from '@/lib/core/version.gen';
 
 export const dynamic = 'force-dynamic';
-
-const PROJECT_VERSION = '1.1.5';
 
 export async function GET() {
   const kv = await resolveKV();
@@ -21,8 +18,7 @@ export async function GET() {
   })();
   return NextResponse.json({
     name: 'autotunnel',
-    version: PROJECT_VERSION,
-    coreVersion: CORE_VERSION,
+    version: '1.0.0',
     runtime,
     storage: { driver: currentKVDriver() || kv.driverName, resolved: storageDriver },
     adminConfigured: Boolean(
