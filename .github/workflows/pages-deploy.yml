@@ -8,7 +8,7 @@
 # 需要在 GitHub 仓库 Settings → Secrets and variables → Actions 配置:
 #   Secrets(必填):
 #     CLOUDFLARE_API_TOKEN  部署权限(Pages:Edit + Workers Scripts:Edit, 建议含 D1:Edit)
-#     ADMIN_SECRET          管理后台密码(与本地 .env 的 ADMIN_SECRET 一致)
+#     ADMIN          管理后台密码(与本地 .env 的 ADMIN 一致)
 #     JWT_SECRET            JWT 签名密钥(与本地 .env 的 JWT_SECRET 一致)
 #   Variables(可选):
 #     DEPLOYTYPE            部署类型覆盖(workers|pages; 高于 deploy.config.js deployType)
@@ -55,7 +55,7 @@ jobs:
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       # 运行时密钥(部署前经 Pages API 写入项目 env_vars secret_text)
-      ADMIN_SECRET: ${{ secrets.ADMIN_SECRET }}
+      ADMIN: ${{ secrets.ADMIN }}
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
       # 可选：远程模式 websocket 地址（留空 = 本地网关; 兼容旧名 GEMTD_WS_URL）
       REMOTE_WS_URL: ${{ secrets.REMOTE_WS_URL || secrets.GEMTD_WS_URL }}
@@ -100,20 +100,20 @@ jobs:
 
       - name: Verify required secrets
         run: |
-          # 必需 secret: CLOUDFLARE_API_TOKEN(部署用) + ADMIN_SECRET / JWT_SECRET(管理后台与 JWT 签名)
+          # 必需 secret: CLOUDFLARE_API_TOKEN(部署用) + ADMIN / JWT_SECRET(管理后台与 JWT 签名)
           if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
             echo "::error::Missing CLOUDFLARE_API_TOKEN secret."
             exit 1
           fi
-          if [ -z "$ADMIN_SECRET" ]; then
-            echo "::error::Missing ADMIN_SECRET secret (值应与本地 .env 的 ADMIN_SECRET 一致, 即管理后台密码)。"
+          if [ -z "$ADMIN" ]; then
+            echo "::error::Missing ADMIN secret (值应与本地 .env 的 ADMIN 一致, 即管理后台密码)。"
             exit 1
           fi
           if [ -z "$JWT_SECRET" ]; then
             echo "::error::Missing JWT_SECRET secret (值应与本地 .env 的 JWT_SECRET 一致, 即 JWT 签名密钥)。"
             exit 1
           fi
-          echo "✓ Required secrets present (CLOUDFLARE_API_TOKEN, ADMIN_SECRET, JWT_SECRET)."
+          echo "✓ Required secrets present (CLOUDFLARE_API_TOKEN, ADMIN, JWT_SECRET)."
 
       - name: Detect PROXY_MODE (proxy passthrough)
         # v8.9.8: 移除 FRAMEWORK=='next' 门控 —— PROXY_MODE 是配置开关, 决定是否
@@ -462,10 +462,10 @@ jobs:
         env:
           # 构建期占位环境变量(仅构建机器使用, 不会进入运行时):
           # - DATABASE_URL: Prisma 客户端模块加载需要非空 URL
-          # - ADMIN_SECRET / JWT_SECRET: 防止构建期读取到空值
+          # - ADMIN / JWT_SECRET: 防止构建期读取到空值
           # v8.9.12: DATABASE_URL 引用 .env 解析结果, 不再硬编码数据库文件名
           DATABASE_URL: "${{ env.DATABASE_URL_VALUE }}"
-          ADMIN_SECRET: "build-placeholder"
+          ADMIN: "build-placeholder"
           JWT_SECRET: "build-placeholder"
           # NEXT_PUBLIC_* 是构建期内联: 浏览器直连 WS 地址在这里注入(可选)
           NEXT_PUBLIC_WS_URL: "${{ vars.NEXT_PUBLIC_WS_URL }}"
@@ -791,7 +791,7 @@ jobs:
         run: |
           # v8.9.1 需求4: PROXY_MODE / LANGUAGE 注入 Pages 项目 vars 环境变量(production)。
           # 适配层(env.PROXY_MODE)与 SSR 运行时(process.env)读取。
-          # ADMIN_SECRET / JWT_SECRET 以 secret_text 写入(等价 wrangler pages secret put);
+          # ADMIN / JWT_SECRET 以 secret_text 写入(等价 wrangler pages secret put);
           # REMOTE_WS_URL 为 secret(可选); NEXT_PUBLIC_WS_URL 已构建期内联, 不在此配置。
           #
           # 注: 此步骤在 deploy 之前执行 —— Pages 的 env_vars 在"部署创建时"快照,
@@ -821,7 +821,7 @@ jobs:
           // PROXY_MODE: 含 apiKey 的完整透传配置(未开启时注入 'false' 显式关闭)
           envVars.PROXY_MODE = plain(process.env.PROXY_MODE_RAW || 'false');
           // 必填 secrets(上方 Verify 步骤已保证非空)
-          envVars.ADMIN_SECRET = secret(process.env.ADMIN_SECRET || '');
+          envVars.ADMIN = secret(process.env.ADMIN || '');
           envVars.JWT_SECRET = secret(process.env.JWT_SECRET || '');
           if (process.env.REMOTE_WS_URL) envVars.REMOTE_WS_URL = secret(process.env.REMOTE_WS_URL);
 
@@ -878,7 +878,7 @@ jobs:
               console.error('::error::缺少 CLOUDFLARE_ACCOUNT_ID / PROJECT_NAME / CLOUDFLARE_API_TOKEN');
               process.exit(1);
             }
-            const NEED = ['NODE_ENV', 'LANGUAGE', 'PROXY_MODE', 'ADMIN_SECRET', 'JWT_SECRET'];
+            const NEED = ['NODE_ENV', 'LANGUAGE', 'PROXY_MODE', 'ADMIN', 'JWT_SECRET'];
             const mask = (v) => {
               const s = String(v == null ? '' : v);
               const at = s.indexOf('@');
@@ -1049,11 +1049,11 @@ jobs:
         # 不存在, secrets 由通用 "Configure secrets on Worker" 步骤写入。
         if: env.FRAMEWORK == 'nuxt' && env.DEPLOY_TYPE == 'pages'
         run: |
-          if [ -z "$ADMIN_SECRET" ]; then
-            echo "::error::缺少 ADMIN_SECRET! 请在 GitHub 仓库 Settings → Secrets and variables → Actions 添加 ADMIN_SECRET secret(值同本地 .env 的 ADMIN_SECRET)。"
+          if [ -z "$ADMIN" ]; then
+            echo "::error::缺少 ADMIN! 请在 GitHub 仓库 Settings → Secrets and variables → Actions 添加 ADMIN secret(值同本地 .env 的 ADMIN)。"
             exit 1
           fi
-          printf '%s' "$ADMIN_SECRET" | npx wrangler pages secret put ADMIN_SECRET --project-name "${{ env.PROJECT_NAME }}"
+          printf '%s' "$ADMIN" | npx wrangler pages secret put ADMIN --project-name "${{ env.PROJECT_NAME }}"
 
           if [ -z "$JWT_SECRET" ]; then
             echo "::error::缺少 JWT_SECRET! 请在 GitHub 仓库 Settings → Secrets and variables → Actions 添加 JWT_SECRET secret(值同本地 .env 的 JWT_SECRET)。"
@@ -1063,13 +1063,13 @@ jobs:
 
           SECRET_LIST=$(npx wrangler pages secret list --project-name "${{ env.PROJECT_NAME }}" 2>&1)
           echo "$SECRET_LIST"
-          for name in ADMIN_SECRET JWT_SECRET; do
+          for name in ADMIN JWT_SECRET; do
             if ! echo "$SECRET_LIST" | grep -q "$name"; then
               echo "::error::$name 未能写入 Pages 项目, 请检查 wrangler pages secret 输出。"
               exit 1
             fi
           done
-          echo "✓ Secrets configured (ADMIN_SECRET, JWT_SECRET confirmed)"
+          echo "✓ Secrets configured (ADMIN, JWT_SECRET confirmed)"
 
       # ---- 部署(按 deployType 分支; Nuxt 恒为 Pages) ----
       # Next.js+pages / Nuxt: production 分支 = main, main 分支 push 等价于生产发布。
@@ -1132,9 +1132,9 @@ jobs:
           # 顺序说明: `wrangler secret put` 要求 Worker 已存在,
           # 因此先 deploy(首次 run 创建 Worker; Next/Nuxt 两条 workers 链路的
           # deploy 步骤均在本步骤之前), 再写 secrets(secrets 写入后立即生效)。
-          # 必需 secret: ADMIN_SECRET(管理后台密码) 和 JWT_SECRET(JWT 签名密钥)。
+          # 必需 secret: ADMIN(管理后台密码) 和 JWT_SECRET(JWT 签名密钥)。
           # 两者缺失时前置校验步骤已报错; 此处再次防御并在写入后验证。
-          printf '%s' "$ADMIN_SECRET" | npx wrangler secret put ADMIN_SECRET --name "$PROJECT_NAME"
+          printf '%s' "$ADMIN" | npx wrangler secret put ADMIN --name "$PROJECT_NAME"
           printf '%s' "$JWT_SECRET" | npx wrangler secret put JWT_SECRET --name "$PROJECT_NAME"
 
           # PROXY_MODE 运行时注入: /api-forward 运行时读取 process.env.PROXY_MODE
@@ -1161,13 +1161,13 @@ jobs:
           # 验证两个必需 secret 均已写入
           SECRET_LIST=$(npx wrangler secret list --name "$PROJECT_NAME" 2>&1)
           echo "$SECRET_LIST"
-          for name in ADMIN_SECRET JWT_SECRET; do
+          for name in ADMIN JWT_SECRET; do
             if ! echo "$SECRET_LIST" | grep -q "$name"; then
               echo "::error::$name 未能写入 Worker, 请检查 wrangler secret 输出。"
               exit 1
             fi
           done
-          echo "✓ Secrets configured (ADMIN_SECRET, JWT_SECRET confirmed)"
+          echo "✓ Secrets configured (ADMIN, JWT_SECRET confirmed)"
 
       - name: Deploy to Cloudflare Pages (Nuxt 产物)
         if: env.FRAMEWORK == 'nuxt' && env.DEPLOY_TYPE == 'pages'
