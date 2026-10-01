@@ -72,15 +72,18 @@ export default {
 //                         Cloudflare GraphQL 用量查询的硬性前置(与 cmliu/edgetunnel
 //                         后台弹窗提示"API令牌权限 开启 Account Analytics > Read 即可"
 //                         完全一致), 缺失时管理后台顶部"Workers/Pages 请求使用情况"
-//                         模块按原版语义静默隐藏(v1.0.5 起部署工作流会实测该权限并
-//                         在日志/摘要显著告警; 编辑 Token 追加权限无需更换 Token 值)
+//                         模块按原版语义静默隐藏(编辑 Token 追加权限无需更换 Token 值;
+//                         部署日志 "Resolve Cloudflare account ID" 步骤的 wrangler whoami
+//                         会打印 Token 权限表可直接核对)
 //   ADMIN_SECRET          — 管理后台密码(= 原项目 ADMIN 变量, 运行时经 Pages env_vars 自动注入)
 //   JWT_SECRET            — JWT 签名密钥(运行时经 Pages env_vars 自动注入)
 //   REMOTE_WS_URL         — 可选
-//   CLOUDFLARE_ACCOUNT_ID 账号 ID(缺省自动探测; Token 需含 Account Settings:Read)
+//   CLOUDFLARE_ACCOUNT_ID 账号 ID(缺省优先用 wrangler whoami 自动探测, 失败回落 REST; 需 Token 含 Account Settings:Read)
 //   AUTOSYNC_TOKEN        — 可选, 管理后台"一键更新发布"用的 GitHub PAT(需 Actions: write);
 //                           缺省回落 Actions 内置 GITHUB_TOKEN(公共仓库即可用)
-//   OWNER_GITHUB / OWNER_TG — 可选 Variable, 管理面板社交入口展示为部署者自己的主页链接
+//   OWNER_GITHUB / OWNER_TG — 可选 Variable, 管理面板底部社交入口链接;
+//                           v1.0.5 起默认指向 kentpan/edgetunnel 与 t.me/kentpan,
+//                           配置后覆盖为自己的主页
 //
 // 运行时环境变量注入说明:
 //   工作流自动把 ADMIN_SECRET / JWT_SECRET / NODE_ENV / LANGUAGE / PROXY_MODE /
@@ -88,7 +91,7 @@ export default {
 //   Pages 项目 env_vars —— 其中 CLOUDFLARE_API_TOKEN + CLOUDFLARE_ACCOUNT_ID
 //   即"请求统计面板"的部署默认凭据(服务端自动写入 KV cf.json, 核心
 //   getCloudflareUsage 携凭据直查 Cloudflare GraphQL, UI 与数据获取与
-//   cmliu/edgetunnel 完全一致; Token 轮换后重新部署, 凭据自动跟随)。其余
+//   cmliu/edgetunnel 完全一致)。其余
 //   原核心可选变量
 //   (KEY / UUID / HOST / PROXYIP / BEST_SUB / URL / GO / DEBUG / OFF_LOG /
 //   TCP_CONCURRENT_DIAL / PROXY_CONCURRENT_DIAL / PRELOAD_RACE_DIAL / WS_PATH)

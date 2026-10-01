@@ -137,9 +137,6 @@
 # 需要在 GitHub 仓库 Settings → Secrets and variables → Actions 配置:
 #   Secrets(必填):
 #     CLOUDFLARE_API_TOKEN  部署权限(Pages:Edit + Workers Scripts:Edit, 建议含 D1:Edit)
-#                          兼请求统计凭据: 需再含 Account Analytics:Read, 否则管理
-#                          后台顶部"Workers/Pages 请求使用情况"模块静默隐藏(v1.0.5
-#                          预检步骤会实测并告警; 与 cmliu/edgetunnel 弹窗提示一致)
 #     ADMIN_SECRET          管理后台密码(与本地 .env 的 ADMIN_SECRET 一致)
 #     JWT_SECRET            JWT 签名密钥(与本地 .env 的 JWT_SECRET 一致)
 #   Variables(可选):
@@ -156,8 +153,8 @@ name: Deploy to Cloudflare
 on:
   push:
     branches: [main]
-  # v1.0.2: 支持 sync-upstream.yml 同步到更新后直接调用本工作流发布
-  # (workflow_call 进程内调用, 规避 GITHUB_TOKEN push 事件不触发其他工作流的限制)
+  # sync-upstream.yml 同步到更新后直接调用本工作流发布(workflow_call 进程内
+  # 调用, 规避 GITHUB_TOKEN push 事件不触发其他工作流的限制)
   workflow_call: {}
   workflow_dispatch:
     inputs:
@@ -195,7 +192,7 @@ jobs:
       # 可选：远程模式 websocket 地址（留空 = 本地网关; 兼容旧名 GEMTD_WS_URL）
       REMOTE_WS_URL: ${{ secrets.REMOTE_WS_URL || secrets.GEMTD_WS_URL }}
       NEXT_PUBLIC_WS_URL: ${{ vars.NEXT_PUBLIC_WS_URL }}
-      # v1.0.2 一键更新发布(管理后台触发 sync-upstream.yml)与面板作者链接
+      # 一键更新发布(管理后台按钮 → sync-upstream.yml)与面板作者链接
       AUTOSYNC_TOKEN: ${{ secrets.AUTOSYNC_TOKEN }}
       AUTOSYNC_FALLBACK_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GITHUB_REPOSITORY_NAME: ${{ github.repository }}
@@ -478,7 +475,23 @@ jobs:
           fi
 
           if [ -z "$ACCOUNT_ID" ]; then
-            echo "::notice::未配置账号 ID, 开始自动探测..."
+            echo "::notice::未配置账号 ID, 使用 wrangler whoami 探测..."
+
+            # wrangler 优先(账号 ID / Token 校验 / 权限表一挥而就):
+            # whoami 输出含账号表与 Token 权限表, 全部打印进部署日志 ——
+            # 部署 Token 实际具备哪些权限一眼可核(含“请求统计面板”所需的
+            # Account 级 Analytics:Read)。
+            WHOAMI=$(npx wrangler whoami 2>&1 || true)
+            echo "$WHOAMI"
+            ACCOUNT_ID=$(echo "$WHOAMI" | grep -oE '[0-9a-f]{32}' | head -1 || echo "")
+
+            if [ -n "$ACCOUNT_ID" ]; then
+              echo "::notice::wrangler 探测到账号 ID: $ACCOUNT_ID(建议填入 deploy.config.js 的 accountId 或设置 secret 以加快后续部署)"
+            fi
+          fi
+
+          if [ -z "$ACCOUNT_ID" ]; then
+            echo "::notice::wrangler 未探测到账号 ID, 回落 REST API 探测..."
 
             # 1) 先检测 TOKEN 是否有效
             VERIFY_OK=$(curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
@@ -510,62 +523,6 @@ jobs:
 
           echo "CLOUDFLARE_ACCOUNT_ID=$ACCOUNT_ID" >> $GITHUB_ENV
           echo "::notice::最终使用账号 ID: $ACCOUNT_ID"
-
-      - name: Precheck CF Analytics permission (usage panel)
-        # v1.0.5: 提前用部署 Token 实测 Cloudflare GraphQL Analytics 读权限 ——
-        # 管理后台"Workers/Pages 请求使用情况"模块的唯一数据源(核心原版
-        # getCloudflareUsage 直查 AccountWorkersInvocationsAdaptive)。仅含
-        # Pages/D1/KV Edit 权限的部署 Token 查询会被拒(authorization denied),
-        # 面板按 cmliu/edgetunnel 原版语义静默隐藏, 部署全程无任何报错,
-        # 极难排查(v1.0.4 线上 2 小时排查事故的根因)。此处实测并显著告警,
-        # 不阻断部署(请求统计为可选功能)。与核心查询同款 GraphQL 语句,
-        # 结果写入 GITHUB_ENV(CF_ANALYTICS_STATUS) 供部署摘要展示。
-        run: |
-          node - <<'NODE_SCRIPT'
-          const fs = require('node:fs');
-          (async () => {
-            const token = process.env.CLOUDFLARE_API_TOKEN;
-            const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
-            const setStatus = (s) => { try { fs.appendFileSync(process.env.GITHUB_ENV, `CF_ANALYTICS_STATUS=${s}\n`); } catch {} };
-            if (!token || !accountId) {
-              console.log('跳过 Analytics 权限预检(Token/AccountID 缺失)');
-              setStatus('skipped');
-              return;
-            }
-            const now = new Date(); now.setUTCHours(0, 0, 0, 0);
-            try {
-              const res = await fetch('https://api.cloudflare.com/client/v4/graphql', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                body: JSON.stringify({
-                  query: `query getBillingMetrics($AccountID: String!, $filter: AccountWorkersInvocationsAdaptiveFilter_InputObject) { viewer { accounts(filter: {accountTag: $AccountID}) { workersInvocationsAdaptive(limit: 1, filter: $filter) { sum { requests } } } } }`,
-                  variables: { AccountID: accountId, filter: { datetime_geq: now.toISOString(), datetime_leq: new Date().toISOString() } },
-                }),
-              });
-              const j = await res.json().catch(() => ({}));
-              const err = (j.errors && j.errors[0] && j.errors[0].message) || (!res.ok ? `HTTP ${res.status}` : '');
-              if (!err) {
-                console.log('✓ Token 具备 Analytics 读权限 —— 管理后台"Workers/Pages 请求使用情况"模块将正常显示数据');
-                setStatus('ok');
-                return;
-              }
-              const denied = /authorization|authenticat|not authorized|permission|token/i.test(err);
-              console.log(`::warning::CLOUDFLARE_API_TOKEN 用量查询失败: ${err}`);
-              if (denied) {
-                console.log('::warning::Token 缺少 "Account Analytics: Read" 权限 → 管理后台顶部"Workers/Pages 请求使用情况"模块不会显示(其余全部功能不受影响)。');
-                console.log('::warning::修复(约 1 分钟): Cloudflare Dashboard → 右上角头像 → My Profile → API Tokens → 找到部署用 Token → 编辑 → 权限添加 Account → Analytics → Read → 保存(Token 值不变, 无需更新 GitHub Secret) → 重新运行本工作流。');
-                console.log('::warning::验证: 部署完成后浏览器访问 https://<项目域名>/autotunnel/cf-usage —— success:true 即模块已可显示; msg 字段会给出具体失败原因与修复指引。');
-                setStatus('denied');
-              } else {
-                console.log('::warning::用量查询异常(不阻断部署), 可访问 https://<项目域名>/autotunnel/cf-usage 查看详情。');
-                setStatus('error');
-              }
-            } catch (e) {
-              console.log(`::warning::Analytics 权限预检网络异常(不阻断): ${e && e.message}`);
-              setStatus('error');
-            }
-          })();
-          NODE_SCRIPT
 
       - name: Install dependencies (npm ci)
         run: |
@@ -650,7 +607,11 @@ jobs:
             echo "::error::opennextjs-cloudflare 本地 bin 缺失(适配器安装未生效), 终止构建以避免 npx 回落拉取安全占位包。"
             exit 1
           fi
-          npx opennextjs-cloudflare build
+          # --skipWranglerConfigCheck: wrangler.toml 由后续 "Generate wrangler.toml"
+          # 步骤按 deploy.config.js 动态生成(需 D1/KV ID, 时序在构建之后) —— 本步骤
+          # 构建时仓库尚未携带 wrangler.toml; 新版 @opennextjs/cloudflare 会强校验
+          # 该文件存在, 跳过该校验以维持"仓库无需携带静态 wrangler.toml"的设计。
+          npx opennextjs-cloudflare build --skipWranglerConfigCheck
           if [ ! -f "$OPENNEXT_OUTPUT_DIR/worker.js" ]; then
             echo "::error::OpenNext 构建产物缺失: $OPENNEXT_OUTPUT_DIR/worker.js"
             exit 1
@@ -1021,17 +982,13 @@ jobs:
           envVars.ADMIN_SECRET = secret(process.env.ADMIN_SECRET || '');
           envVars.JWT_SECRET = secret(process.env.JWT_SECRET || '');
           if (process.env.REMOTE_WS_URL) envVars.REMOTE_WS_URL = secret(process.env.REMOTE_WS_URL);
-          // Cloudflare 用量统计默认凭据: 管理后台"部署默认凭据"方案经
-          // /admin/getCloudflareUsage(门控注入)与 /autotunnel/cf-usage 端点消费;
-          // 即部署本项目的 CLOUDFLARE_API_TOKEN 默认兼作请求量统计凭据。
+          // 请求统计面板凭据: 部署本项目的 CLOUDFLARE_API_TOKEN 默认兼作
+          // 请求量统计凭据(服务端自动写入 KV cf.json, 核心携凭据直查 CF 用量)
           envVars.CLOUDFLARE_API_TOKEN = secret(token);
           envVars.CLOUDFLARE_ACCOUNT_ID = plain(accountId);
-          // v1.0.2 一键更新发布链路(管理后台"一键更新发布"按钮 →
-          // /autotunnel/trigger-sync → GitHub workflow_dispatch):
-          //   AUTOSYNC_TOKEN 优先用户自配 PAT, 缺省回落 Actions 内置 GITHUB_TOKEN
-          //   (workflow_dispatch 属 GITHUB_TOKEN 例外事件, 可正常创建 run);
-          //   GITHUB_REPOSITORY = 部署目标仓库; OWNER_GITHUB/OWNER_TG 可选,
-          //   用于把管理面板社交入口展示为部署者自己的主页(留空保持原版)。
+          // 一键更新发布(管理后台按钮 → trigger-sync → workflow_dispatch):
+          // AUTOSYNC_TOKEN 优先用户自配 PAT, 缺省回落 Actions 内置 GITHUB_TOKEN;
+          // OWNER_GITHUB/OWNER_TG 可选, 覆盖面板默认作者链接(kentpan)
           envVars.AUTOSYNC_TOKEN = secret(process.env.AUTOSYNC_TOKEN || process.env.AUTOSYNC_FALLBACK_TOKEN || '');
           envVars.GITHUB_REPOSITORY = plain(process.env.GITHUB_REPOSITORY_NAME || '');
           if (process.env.OWNER_GITHUB) envVars.OWNER_GITHUB = plain(process.env.OWNER_GITHUB);
@@ -1451,17 +1408,6 @@ jobs:
           echo "| 触发分支 | ${{ github.ref_name }} |" >> $GITHUB_STEP_SUMMARY
           echo "| 模式 | ${{ env.PROXY_PASSTHROUGH == 'true' && format('代理透传(PROXY_MODE 注入 vars, /api/* 全量 Functions 透传)') || '本地数据库(D1/KV)' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| 语言模式 | ${{ env.LANGUAGE_RAW || 'auto' }} |" >> $GITHUB_STEP_SUMMARY
-          # v1.0.5: 请求统计面板 Token 权限状态(Analytics 预检步骤结果) —— 部署者
-          # 一眼可见"面板为什么不显示", 不必再进线上环境盲猜。
-          if [ "${{ env.CF_ANALYTICS_STATUS }}" = "ok" ]; then
-            echo "| 请求统计面板 | ✅ 可用(Token 具备 Analytics:Read, 顶部\"Workers/Pages 请求使用情况\"模块正常显示) |" >> $GITHUB_STEP_SUMMARY
-          elif [ "${{ env.CF_ANALYTICS_STATUS }}" = "denied" ]; then
-            echo "| 请求统计面板 | ⚠️ 不可用 —— Token 缺少 Account Analytics:Read 权限(编辑 Token 加权限后重新部署即可, Token 值不变; 详见预检步骤 warning) |" >> $GITHUB_STEP_SUMMARY
-          elif [ "${{ env.CF_ANALYTICS_STATUS }}" = "error" ]; then
-            echo "| 请求统计面板 | ⚠️ 用量查询异常(部署后访问 https://<项目域名>/autotunnel/cf-usage 查看详情) |" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "| 请求统计面板 | (预检跳过: Token/AccountID 缺失) |" >> $GITHUB_STEP_SUMMARY
-          fi
           # v8.9.6: 摘要同时镜像到步骤日志 —— $GITHUB_STEP_SUMMARY 只渲染在运行首页的
           # "Summary" 标签, 步骤日志本身看起来是空的(易误判为"步骤没执行/没有输出")
           echo "--- Deployment summary(日志镜像; 完整表格见运行首页 Summary 标签) ---"

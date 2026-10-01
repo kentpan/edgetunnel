@@ -33,7 +33,7 @@ Autotunnel 是对 [kentpan/edgetunnel](https://github.com/kentpan/edgetunnel)（
 | ⚙️ **worker 服务端核心** | **完全保持不变** —— `worker/_worker.js` 与原仓库字节一致(MD5 校验), VLESS/Trojan、WS/gRPC/XHTTP、订阅生成、管理 API、日志记录等全部为原版服务 |
 | 🔌 **自动适配层** | 运行时自动识别环境, 存储链: **KV 绑定 → D1 绑定(DB) → node:sqlite → 内存**; 平台垫片仅补齐 workerd 语义(MD5 / fetcher.connect / WebSocketPair / request.cf), 核心零改动 |
 | 🚀 **部署两件套** | `deploy.config.js` + `.github/workflows/pages-deploy.yml`, 默认 **pages** 方式发布, 支持 `deployType: pages \| workers` 与 `DEPLOYTYPE` 仓库变量覆盖 |
-| 📊 **CF 用量统计** | 面板顶部"Workers/Pages 请求使用情况"模块**开箱即显示** —— 部署凭据 `CLOUDFLARE_API_TOKEN`(GitHub Actions Secrets 自动注入 / Node `.env`)被服务端自动写入 cf.json(未配置时), 由核心原版 `getCloudflareUsage` 携凭据直查 Cloudflare GraphQL, UI 与数据获取与 cmliu/edgetunnel 完全一致; 也可在后台改配 UsageAPI/Account ID+Token/Email+Key 自定义方案。⚠️ **Token 必须含 `Account Analytics:Read` 权限**(GraphQL 用量查询硬性前置, 与 cmliu/edgetunnel 弹窗提示一致; 编辑 Token 追加即可, 无需换值) —— 缺失时模块按原版语义静默隐藏, 部署日志与 Summary 会实测告警, 访问 `/autotunnel/cf-usage` 可看具体原因 |
+| 📊 **CF 用量统计** | 面板顶部"Workers/Pages 请求使用情况"模块**开箱即显示** —— 部署凭据 `CLOUDFLARE_API_TOKEN`(GitHub Actions Secrets 自动注入 / Node `.env`)被服务端自动写入 cf.json(未配置时), 由核心原版 `getCloudflareUsage` 携凭据直查 Cloudflare GraphQL, UI 与数据获取与 cmliu/edgetunnel 完全一致; 也可在后台改配 UsageAPI/Account ID+Token/Email+Key 自定义方案。⚠️ **Token 必须含 `Account Analytics:Read` 权限**(GraphQL 用量查询硬性前置, 与 cmliu/edgetunnel 弹窗提示一致; 编辑 Token 追加即可, 无需换值) —— 缺失时模块按原版语义静默隐藏(部署 Actions 日志中 `wrangler whoami` 会打印 Token 权限表可直接核对) |
 
 ## ✨ 特性
 
@@ -50,15 +50,15 @@ Autotunnel 是对 [kentpan/edgetunnel](https://github.com/kentpan/edgetunnel)（
 - **v1.0.3 请求统计开箱即用(源头修复)**:
   - 📊 cf.json 未配置且服务端持有 `CLOUDFLARE_API_TOKEN` 时自动写入部署默认凭据(经 env.KV 同一接口, KV/D1/node:sqlite 后端行为一致), 核心原版 `getCloudflareUsage` 携凭据直查 Cloudflare GraphQL —— 面板顶部"Workers/Pages 请求使用情况"模块无需任何手动配置即显示; 统计弹窗恢复上游原版三方案(UsageAPI / Account ID + API Token / Email + Global API Key, 默认选中 accountid), 与 cmliu/edgetunnel 的 UI 与数据获取完全一致; 管理员显式配置优先, 清空后最多 60s 自动恢复部署默认凭据
   - 移除 v1.0.1 的"🚀 部署默认凭据"弹窗方案与 /admin/getCloudflareUsage 空凭据请求改写垫片 —— 部署凭据改由服务端数据层(cf.json)自动初始化, 从源头解决
-- **v1.0.5 统计面板可观测性 + Token 轮换自愈(线上事故根因修复)**:
-  - 🎯 根因定位: 部署 Token 仅含 Pages/D1/KV Edit 权限时, Cloudflare GraphQL 用量查询返回 `authorization denied`, 面板按原版语义静默隐藏且**部署全程无任何报错**(v1.0.3/v1.0.4 均受影响) —— `Account Analytics:Read` 是统计数据的硬性前置, 与 cmliu/edgetunnel 弹窗提示的要求完全一致
-  - 🛡️ 部署预检: workflow 新增 "Precheck CF Analytics permission" 步骤, 用与核心同款的 GraphQL 查询实测 Token 权限, 缺权限时在 Actions 日志输出显著 warning(含 1 分钟修复指引) 并在运行 Summary 表格输出"请求统计面板"状态行 —— 不再需要进线上环境盲猜
-  - 🔍 诊断翻译: `/autotunnel/cf-usage` 端点把 `authorization denied` / 401 / 账户解析失败翻译为带修复指引的中文提示
-  - 🔄 Token 轮换自愈: 更换部署 Token(重建)后重新部署, KV cf.json 中自动写入的旧凭据经 `cf.deploy.json` 私有标记键识别并自动跟随新 Token(最多 60s); 管理员显式配置的凭据永不被覆盖(标记不匹配即跳过)
+- **v1.0.5 品牌默认 + 部署凭据探测改用 wrangler**:
+  - 🎯 根因归档(线上实证): 仅含 Pages/D1/KV Edit 权限的部署 Token, Cloudflare GraphQL 用量查询返回 `authorization denied`, 面板按原版语义静默隐藏 —— `Account Analytics:Read` 是统计数据的硬性前置(与 cmliu/edgetunnel 弹窗提示一致; 注意必须是 **Account 级**, 不是 Zone 级)
+  - 🛡️ 账号 ID 探测与 Token 权限核对改用 `npx wrangler whoami`(优先), 输出含账号表与 Token 权限表并全部打印进部署日志 —— 部署 Token 实际具备哪些权限一眼可核(wrangler 失败时回落原 REST 探测)
+  - 🔗 面板底部社交入口默认指向 `kentpan/edgetunnel` 与 `t.me/kentpan`(OWNER_GITHUB/OWNER_TG 可覆盖)
+  - ✅ 线上版本自查: 浏览器访问 `/api/health` —— `version` 字段即线上实际部署的版本(如线上报旧值 = 新代码从未上线; `/version` 是上游 UI 版本戳, 不随本项目版本变化)
 - **v1.0.2 新增 —— 零维护自动跟随上游**:
   - 🔄 **上游同步工作流**(`.github/workflows/sync-upstream.yml`): 每 6 小时定时检测上游 `_worker.js` 与前端五页面(login/admin/noADMIN/noKV/version), 任一有更新(含原项目**前端样式/功能**更新)自动同步进本项目 → commit → 直接调用部署工作流发布, 全程无人值守
   - 🚀 **管理后台"一键更新发布"**: 版本弹窗一键触发同步+发布(workflow_dispatch), 免去手动跑 Actions; Pages 部署自动注入触发凭据, Node 部署在 `.env` 配 PAT 即可
-  - 🔗 **面板作者链接可配置**: `.env`/仓库 Variable 配置 `OWNER_GITHUB` / `OWNER_TG`, 管理面板左下角 GitHub/Telegram 入口展示为部署者自己的主页(留空保持原版)
+  - 🔗 **面板作者链接可配置**: `.env`/仓库 Variable 配置 `OWNER_GITHUB` / `OWNER_TG`, 管理面板底部 GitHub/Telegram 入口展示为部署者自己的主页(v1.0.5 起默认指向 `kentpan/edgetunnel` 与 `t.me/kentpan`, 留空即默认)
   - 📚 **喋饭级使用教程**: [docs/使用教程.md](docs/使用教程.md) —— 项目作用/适用人群/三种部署/全功能说明/FAQ
 
 ## 🚀 快速开始
@@ -125,22 +125,21 @@ Cloudflare 线上: `ADMIN_SECRET`/`JWT_SECRET`/`CLOUDFLARE_API_TOKEN`/`CLOUDFLAR
 > 管理后台"请求统计"开箱即用; 无需再手动填 Email/API Key。
 > Node.js 模式在 `.env` 配置同名变量即可达到同样效果。
 >
-> ⚠️ **Token 权限是统计面板的唯一硬性前置**: `Account Analytics:Read` 是
+> ⚠️ **Token 权限是统计面板的硬性前置**: `Account Analytics:Read` 是
 > Cloudflare GraphQL 用量查询的硬性要求(与 cmliu/edgetunnel 后台弹窗提示
-> "API令牌权限 开启 Account Analytics > Read 权限即可"完全一致)。缺失时
-> 模块按原版语义静默隐藏(v1.0.5 之前部署全程无任何报错, 极难排查)。
-> 排查方法(三选一):
-> ① 看部署 Actions 日志的 "Precheck CF Analytics permission" 步骤 —— 实测
->   权限并给出修复指引(仅告警不阻断部署);
-> ② 看运行首页 Summary 的 "请求统计面板" 状态行;
-> ③ 浏览器访问 `https://<项目域名>/autotunnel/cf-usage` —— `msg` 字段直接给出
->   失败原因与修复指引(如 `authorization denied` = 缺 Analytics:Read, 编辑 Token
->   追加权限即可, Token 值不变、无需更新 GitHub Secret)。
->
-> 🔄 **Token 轮换自愈(v1.0.5)**: 更换 `CLOUDFLARE_API_TOKEN`(如重建 Token)后
-> 更新 GitHub Secret 并重新部署, 服务端经 cf.deploy.json 标记识别出 KV cf.json
-> 里是自动写入的旧凭据并自动跟随新 Token(最多 60s); 管理员在后台显式配置的
-> 凭据永不被覆盖。
+> "API令牌权限 开启 Account Analytics > Read 权限即可"完全一致; 注意必须是
+> **Account 级**, 不是 Zone 级 Analytics)。缺失时模块按原版语义静默隐藏。
+> 另一硬性前置: **线上运行时实际使用的 Token 必须就是你在 Dashboard 核对的
+> 那个**(GitHub Secret 更新后需重新部署; 核对了另一个 Token 无效)。
+> 排查方法:
+> ① 看部署 Actions 日志的 "Resolve Cloudflare account ID" 步骤 —— `wrangler whoami`
+>   打印的 Token 权限表(缺失 Analytics:Read 即补, 编辑 Token 追加权限无需换值);
+> ② 浏览器访问 `https://<项目域名>/api/health` —— `version` 字段即线上实际部署的
+>   版本(报旧值 = 新代码从未上线, 重新跑部署工作流并确认 Actions 成功);
+> ③ 浏览器访问 `https://<项目域名>/autotunnel/cf-usage` —— `msg` 字段给出
+>   查询的具体失败原因(如 `authorization denied` = 缺权限, `Authentication failed` = Token 无效)。
+> 修复(约 1 分钟): Cloudflare Dashboard → My Profile → API Tokens → 编辑部署 Token →
+> 权限添加 `Account → Analytics → Read` → 保存(**Token 值不变, 无需更新 GitHub Secret**)→ 重新部署。
 
 ### 🔄 自动同步更新(v1.0.2)
 

@@ -350,19 +350,7 @@ const env = buildCoreEnv(kv);
 /* 同构) —— cf.json 未配置且持有 CLOUDFLARE_API_TOKEN 时经 KV 写入      */
 /* {AccountID, APIToken}: 核心 getCloudflareUsage 原版携凭据直查 CF      */
 /* GraphQL, 面板"Workers/Pages 请求使用情况"模块开箱显示; 已配置不覆盖。  */
-/* v1.0.5: Token 轮换自愈 —— cf.json 纯 APIToken 形态且经 cf.deploy.json */
-/* 标记确认是自动写入的凭据时, 部署 Token 更新后自动跟随(管理员显式配置   */
-/* 标记不匹配, 永不覆盖); 无标记 = v1.0.3/v1.0.4 遗留形态, 同样跟随。    */
-/* 注: 用量查询要求 Token 包含 "Account Analytics: Read" 权限。          */
 /* ------------------------------------------------------------------ */
-const DEPLOY_MARK_KEY = 'cf.deploy.json';
-async function readDeployMark() {
-  try {
-    const raw = await kv.get(DEPLOY_MARK_KEY);
-    if (!raw) return '';
-    return String((JSON.parse(raw) || {}).APIToken || '').trim();
-  } catch { return ''; }
-}
 async function ensureDeployDefaultCredentials() {
   try {
     const token = (process.env.CLOUDFLARE_API_TOKEN || '').trim();
@@ -371,36 +359,7 @@ async function ensureDeployDefaultCredentials() {
     try { if (raw) cf = JSON.parse(raw); } catch { cf = null; }
     const configured = cf && [cf.Email, cf.GlobalAPIKey, cf.AccountID, cf.APIToken, cf.UsageAPI]
       .some((v) => v !== null && v !== undefined && String(v).trim() !== '');
-    if (configured) {
-      // Token 轮换自愈(v1.0.5): 纯 APIToken 形态 + 自动写入标记确认 → 跟随新 Token
-      const tokenOnly = cf && cf.APIToken && String(cf.APIToken).trim() !== ''
-        && [cf.Email, cf.GlobalAPIKey, cf.UsageAPI]
-          .every((v) => v === null || v === undefined || String(v).trim() === '');
-      if (token && tokenOnly && String(cf.APIToken).trim() !== token) {
-        const mark = await readDeployMark();
-        const managed = !mark || mark === String(cf.APIToken).trim();
-        if (managed) {
-          let accountId = (process.env.CLOUDFLARE_ACCOUNT_ID || '').trim() || String(cf.AccountID || '').trim();
-          if (!accountId) {
-            const r = await fetch('https://api.cloudflare.com/client/v4/accounts?per_page=1', {
-              headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-            });
-            if (r.ok) {
-              const j = await r.json().catch(() => ({}));
-              accountId = (j && j.result && j.result[0] && j.result[0].id) || '';
-            }
-          }
-          if (accountId) {
-            await kv.put('cf.json', JSON.stringify({
-              Email: null, GlobalAPIKey: null, AccountID: accountId, APIToken: token, UsageAPI: null,
-            }, null, 2));
-            await kv.put(DEPLOY_MARK_KEY, JSON.stringify({ APIToken: token }, null, 2));
-            console.log('[autotunnel/cf-usage] 部署凭据已轮换 → cf.json 自动更新为新 CLOUDFLARE_API_TOKEN(Token 轮换自愈)');
-          }
-        }
-      }
-      return;
-    }
+    if (configured) return;
     if (!token) return; // 无部署凭据 → 保持未配置(与原版一致)
     let accountId = (process.env.CLOUDFLARE_ACCOUNT_ID || '').trim();
     if (!accountId) {
@@ -415,9 +374,7 @@ async function ensureDeployDefaultCredentials() {
     await kv.put('cf.json', JSON.stringify({
       Email: null, GlobalAPIKey: null, AccountID: accountId, APIToken: token, UsageAPI: null,
     }, null, 2));
-    await kv.put(DEPLOY_MARK_KEY, JSON.stringify({ APIToken: token }, null, 2));
     console.log('[autotunnel/cf-usage] cf.json 未配置 → 已写入部署默认凭据(CLOUDFLARE_API_TOKEN), 请求统计开箱可用');
-    console.warn('[autotunnel/cf-usage] 提示: 部署 Token 需包含 "Account Analytics: Read" 权限, 否则用量查询被拒(面板静默隐藏); 详见 /autotunnel/cf-usage 诊断端点');
   } catch (e) {
     console.warn('[autotunnel/cf-usage] 部署默认凭据初始化失败:', e && e.message);
   }

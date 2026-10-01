@@ -78,12 +78,12 @@ function isCoreServicePath(url, request, env) {
   const path = raw.toLowerCase();
   if ((request.headers.get('upgrade') || '').toLowerCase() === 'websocket') return true;
   if (path.startsWith('cdn-cgi/')) return true;
-  if (['login', 'logout', 'sub', 'locations', 'robots.txt'].includes(path)) return true;
-  // 精确 /login /admin 的 GET/HEAD 交给 Next 路由处理器(复刻页面 + 核心鉴权);
-  // 其余 admin 路径(全部 API)直接进核心
+  if (['logout', 'sub', 'locations', 'robots.txt'].includes(path)) return true;
+  // 精确 /login /admin 的 GET/HEAD/POST 交给 Next 路由处理器(复刻页面 + 核心鉴权
+  // + 作者链接替换); 其余 admin 路径(全部 API)直接进核心
   const method = request.method.toUpperCase();
-  if (path === 'admin') {
-    return !(method === 'GET' || method === 'HEAD');
+  if (path === 'login' || path === 'admin') {
+    return !(method === 'GET' || method === 'HEAD' || method === 'POST');
   }
   if (path.startsWith('admin/')) return true;
   if (UUID_REGEX.test(path)) return true;
@@ -99,17 +99,8 @@ function isCoreServicePath(url, request, env) {
 // "Workers/Pages 请求使用情况"模块开箱显示; cf.json 语义/字段与
 // cmliu/edgetunnel 完全一致, KV/D1 后端行为一致(同一 env.KV 接口写入)。
 // 与 src/lib/adapter/cf-usage.ts(Node 侧)同构。
-//
-// v1.0.5: Token 轮换自愈 —— cf.json 为"纯 APIToken 形态"且经 cf.deploy.json
-// 标记确认是自动初始化写入的凭据时, 部署 Token 更新后自动跟随(管理员
-// 显式保存的凭据标记不匹配, 永不覆盖); 无标记 = v1.0.3/v1.0.4 自动写入
-// 的遗留形态(当时未写标记), 同样跟随。标记键核心与管理面板均不读取,
-// 无可见副作用。注意: GraphQL 用量查询要求 Token 包含
-// "Account Analytics: Read"权限(与 cmliu/edgetunnel 弹窗提示一致),
-// 部署工作流已实测该权限并告警(pages-deploy.yml 预检步骤)。
 const CF_INIT = { state: 'unknown', lastCheck: 0, lastAttempt: 0 };
 const CF_INIT_TTL = 60e3, CF_INIT_BACKOFF = 30e3;
-const CF_DEPLOY_MARK_KEY = 'cf.deploy.json';
 async function ensureDeployDefaultUsage(env) {
   try {
     const envSrc = env || globalThis.__AUTOTUNNEL_CF_ENV__ || {};
@@ -128,40 +119,7 @@ async function ensureDeployDefaultUsage(env) {
     } catch { cf = null; }
     const configured = cf && [cf.Email, cf.GlobalAPIKey, cf.AccountID, cf.APIToken, cf.UsageAPI]
       .some((v) => v !== null && v !== undefined && String(v).trim() !== '');
-    if (configured) {
-      // Token 轮换自愈(v1.0.5): 纯 APIToken 形态 + 自动写入标记确认 →
-      // 部署 Token 已轮换时自动跟随; 管理员显式配置(标记不匹配)不动
-      const tokenOnly = cf && cf.APIToken && String(cf.APIToken).trim() !== ''
-        && [cf.Email, cf.GlobalAPIKey, cf.UsageAPI]
-          .every((v) => v === null || v === undefined || String(v).trim() === '');
-      if (token && tokenOnly && String(cf.APIToken).trim() !== token) {
-        let mark = '';
-        try {
-          const rawMark = await kv.get(CF_DEPLOY_MARK_KEY);
-          if (rawMark) mark = String((JSON.parse(rawMark) || {}).APIToken || '').trim();
-        } catch { mark = ''; }
-        const managed = !mark || mark === String(cf.APIToken).trim();
-        if (managed) {
-          let accountId = String(envSrc.CLOUDFLARE_ACCOUNT_ID || '').trim() || String(cf.AccountID || '').trim();
-          if (!accountId) {
-            const r = await fetch('https://api.cloudflare.com/client/v4/accounts?per_page=1', {
-              headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-            });
-            if (r.ok) {
-              const j = await r.json().catch(() => ({}));
-              accountId = (j && j.result && j.result[0] && j.result[0].id) || '';
-            }
-          }
-          if (accountId) {
-            await kv.put('cf.json', JSON.stringify({ Email: null, GlobalAPIKey: null, AccountID: accountId, APIToken: token, UsageAPI: null }, null, 2));
-            await kv.put(CF_DEPLOY_MARK_KEY, JSON.stringify({ APIToken: token }, null, 2));
-            console.log('[autotunnel/cf-usage] 部署凭据已轮换 → cf.json 自动更新为新 CLOUDFLARE_API_TOKEN(Token 轮换自愈)');
-          }
-        }
-      }
-      CF_INIT.state = 'configured';
-      return;
-    }
+    if (configured) { CF_INIT.state = 'configured'; return; }
     CF_INIT.state = 'unset';
     if (!token) return;
     if (CF_INIT.lastAttempt && now - CF_INIT.lastAttempt < CF_INIT_BACKOFF) return;
@@ -177,10 +135,8 @@ async function ensureDeployDefaultUsage(env) {
       if (!accountId) return;
     }
     await kv.put('cf.json', JSON.stringify({ Email: null, GlobalAPIKey: null, AccountID: accountId, APIToken: token, UsageAPI: null }, null, 2));
-    await kv.put(CF_DEPLOY_MARK_KEY, JSON.stringify({ APIToken: token }, null, 2));
     CF_INIT.state = 'configured';
     console.log('[autotunnel/cf-usage] cf.json 未配置 → 已写入部署默认凭据(CLOUDFLARE_API_TOKEN), 请求统计开箱可用');
-    console.warn('[autotunnel/cf-usage] 提示: 部署 Token 需包含 "Account Analytics: Read" 权限, 否则用量查询被拒(面板静默隐藏); 详见 /autotunnel/cf-usage 诊断端点');
   } catch (e) { /* 初始化失败不影响核心服务 */ }
 }
 
@@ -209,9 +165,11 @@ export default {
 writeFileSync(join(DIST, '_worker.js'), workerEntry);
 
 console.log('▶ 生成 _routes.json(静态资源 CDN 直出) ...');
+// include/exclude 必须为字符串数组(Cloudflare Pages 官方格式; wrangler 新版
+// 对 _routes.json 做严格校验, 字符串形态会被拒绝导致部署失败)
 writeFileSync(
   join(DIST, '_routes.json'),
-  JSON.stringify({ version: 1, include: '/*', exclude: ['/_next/static/*'] }, null, 2),
+  JSON.stringify({ version: 1, include: ['/*'], exclude: ['/_next/static/*'] }, null, 2),
 );
 
 console.log('▶ 生成 _headers(基础安全头) ...');
