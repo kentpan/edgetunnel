@@ -78,7 +78,7 @@ export function ensureMd5Support(): void {
   if (subtleProto.__autotunnelMd5) return;
 
   const originalDigest = subtle.digest.bind(subtle);
-  const patched = async (algorithm: AlgorithmIdentifier | Ed448Params, data?: BufferSource) => {
+  const patched = async (algorithm: AlgorithmIdentifier | { name?: string }, data?: BufferSource) => {
     const name =
       typeof algorithm === 'string'
         ? algorithm.toUpperCase()

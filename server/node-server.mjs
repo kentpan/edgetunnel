@@ -41,6 +41,7 @@ const AUTOTUNNEL_KEYS = [
   'KEY', 'UUID', 'HOST', 'PROXYIP', 'BEST_SUB', 'URL', 'GO', 'DEBUG',
   'OFF_LOG', 'TCP_CONCURRENT_DIAL', 'PROXY_CONCURRENT_DIAL',
   'PRELOAD_RACE_DIAL', 'WS_PATH',
+  'CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_ACCOUNT_ID',
 ];
 
 function parseEnvFile(content) {
@@ -343,6 +344,42 @@ const WebSocketServer = (await import('ws')).WebSocketServer;
 
 const kv = await createKV();
 const env = buildCoreEnv(kv);
+
+/* ------------------------------------------------------------------ */
+/* cf.json 部署默认凭据自动初始化(v1.0.3, 与 src/lib/adapter/cf-usage.ts */
+/* 同构) —— cf.json 未配置且持有 CLOUDFLARE_API_TOKEN 时经 KV 写入      */
+/* {AccountID, APIToken}: 核心 getCloudflareUsage 原版携凭据直查 CF      */
+/* GraphQL, 面板"Workers/Pages 请求使用情况"模块开箱显示; 已配置不覆盖。  */
+/* ------------------------------------------------------------------ */
+async function ensureDeployDefaultCredentials() {
+  try {
+    const token = (process.env.CLOUDFLARE_API_TOKEN || '').trim();
+    const raw = await kv.get('cf.json');
+    let cf = null;
+    try { if (raw) cf = JSON.parse(raw); } catch { cf = null; }
+    const configured = cf && [cf.Email, cf.GlobalAPIKey, cf.AccountID, cf.APIToken, cf.UsageAPI]
+      .some((v) => v !== null && v !== undefined && String(v).trim() !== '');
+    if (configured) return;
+    if (!token) return; // 无部署凭据 → 保持未配置(与原版一致)
+    let accountId = (process.env.CLOUDFLARE_ACCOUNT_ID || '').trim();
+    if (!accountId) {
+      const r = await fetch('https://api.cloudflare.com/client/v4/accounts?per_page=1', {
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      });
+      if (!r.ok) return;
+      const j = await r.json().catch(() => ({}));
+      accountId = (j && j.result && j.result[0] && j.result[0].id) || '';
+      if (!accountId) return;
+    }
+    await kv.put('cf.json', JSON.stringify({
+      Email: null, GlobalAPIKey: null, AccountID: accountId, APIToken: token, UsageAPI: null,
+    }, null, 2));
+    console.log('[autotunnel/cf-usage] cf.json 未配置 → 已写入部署默认凭据(CLOUDFLARE_API_TOKEN), 请求统计开箱可用');
+  } catch (e) {
+    console.warn('[autotunnel/cf-usage] 部署默认凭据初始化失败:', e && e.message);
+  }
+}
+await ensureDeployDefaultCredentials();
 
 let nextHandler = null;
 if (!CORE_ONLY && HAS_NEXT_BUILD) {

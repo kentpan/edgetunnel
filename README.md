@@ -33,7 +33,7 @@ Autotunnel 是对 [kentpan/edgetunnel](https://github.com/kentpan/edgetunnel)（
 | ⚙️ **worker 服务端核心** | **完全保持不变** —— `worker/_worker.js` 与原仓库字节一致(MD5 校验), VLESS/Trojan、WS/gRPC/XHTTP、订阅生成、管理 API、日志记录等全部为原版服务 |
 | 🔌 **自动适配层** | 运行时自动识别环境, 存储链: **KV 绑定 → D1 绑定(DB) → node:sqlite → 内存**; 平台垫片仅补齐 workerd 语义(MD5 / fetcher.connect / WebSocketPair / request.cf), 核心零改动 |
 | 🚀 **部署两件套** | `deploy.config.js` + `.github/workflows/pages-deploy.yml`, 默认 **pages** 方式发布, 支持 `deployType: pages \| workers` 与 `DEPLOYTYPE` 仓库变量覆盖 |
-| 📊 **CF 用量统计** | 管理后台"请求统计"默认使用部署时配置的 `CLOUDFLARE_API_TOKEN`(GitHub Actions Secrets 自动注入), 无需手动填凭据; Node 环境经 Cloudflare API 查询真实用量, 亦可选用 UsageAPI/Email+Key 自定义方案 |
+| 📊 **CF 用量统计** | 面板顶部"Workers/Pages 请求使用情况"模块**开箱即显示** —— 部署凭据 `CLOUDFLARE_API_TOKEN`(GitHub Actions Secrets 自动注入 / Node `.env`)被服务端自动写入 cf.json(未配置时), 由核心原版 `getCloudflareUsage` 携凭据直查 Cloudflare GraphQL, UI 与数据获取与 cmliu/edgetunnel 完全一致; 也可在后台改配 UsageAPI/Account ID+Token/Email+Key 自定义方案 |
 
 ## ✨ 特性
 
@@ -45,8 +45,11 @@ Autotunnel 是对 [kentpan/edgetunnel](https://github.com/kentpan/edgetunnel)（
 - **配置唯一真源**: 本地/Node 模式全部配置收敛于 `.env`(含 `ADMIN_SECRET`/`DATABASE_URL`), CI 经 GitHub Secrets 自动注入线上
 - **管理密码改名**: 原项目 `ADMIN` 变量统一为 `ADMIN_SECRET`(向下兼容旧名)
 - **v1.0.1**:
-  - 📊 Cloudflare Workers/Pages 可用请求数统计默认走部署凭据 —— 管理后台新增"🚀 部署默认凭据(CLOUDFLARE_API_TOKEN)"方案并设为默认; workflow 自动把部署 Token 注入 Pages env_vars, Node 模式从 `.env`/环境变量读取; 内置 `/autotunnel/cf-usage` 统计端点(Cloudflare GraphQL 同款查询, 60s 缓存), 核心 `cf.json` 的 UsageAPI 指向它即得真实用量
+  - 📊 Cloudflare Workers/Pages 可用请求数统计默认走部署凭据: workflow 自动把部署 Token 注入 Pages env_vars, Node 模式从 `.env`/环境变量读取; 内置 `/autotunnel/cf-usage` 诊断端点(Cloudflare GraphQL 同款查询, 60s 缓存)
   - ▼ 管理后台全部下拉框新增三角箭头与展开切换动画(双层 SVG 交叉滑动, 明暗主题自适应)
+- **v1.0.3 请求统计开箱即用(源头修复)**:
+  - 📊 cf.json 未配置且服务端持有 `CLOUDFLARE_API_TOKEN` 时自动写入部署默认凭据(经 env.KV 同一接口, KV/D1/node:sqlite 后端行为一致), 核心原版 `getCloudflareUsage` 携凭据直查 Cloudflare GraphQL —— 面板顶部"Workers/Pages 请求使用情况"模块无需任何手动配置即显示; 统计弹窗恢复上游原版三方案(UsageAPI / Account ID + API Token / Email + Global API Key, 默认选中 accountid), 与 cmliu/edgetunnel 的 UI 与数据获取完全一致; 管理员显式配置优先, 清空后最多 60s 自动恢复部署默认凭据
+  - 移除 v1.0.1 的"🚀 部署默认凭据"弹窗方案与 /admin/getCloudflareUsage 空凭据请求改写垫片 —— 部署凭据改由服务端数据层(cf.json)自动初始化, 从源头解决
 - **v1.0.2 新增 —— 零维护自动跟随上游**:
   - 🔄 **上游同步工作流**(`.github/workflows/sync-upstream.yml`): 每 6 小时定时检测上游 `_worker.js` 与前端五页面(login/admin/noADMIN/noKV/version), 任一有更新(含原项目**前端样式/功能**更新)自动同步进本项目 → commit → 直接调用部署工作流发布, 全程无人值守
   - 🚀 **管理后台"一键更新发布"**: 版本弹窗一键触发同步+发布(workflow_dispatch), 免去手动跑 Actions; Pages 部署自动注入触发凭据, Node 部署在 `.env` 配 PAT 即可

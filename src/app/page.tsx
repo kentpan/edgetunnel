@@ -46,7 +46,7 @@ export default function Home() {
         {/* Hero */}
         <section className="text-center space-y-5">
           <Badge variant="outline" className="gap-1.5 px-3 py-1 text-sm">
-            <Zap className="h-3.5 w-3.5" /> Autotunnel v1.0.1
+            <Zap className="h-3.5 w-3.5" /> Autotunnel v1.0.3
           </Badge>
           <h1 className="text-3xl sm:text-5xl font-bold tracking-tight">
             Autotunnel
@@ -203,7 +203,7 @@ export default function Home() {
       <footer className="mt-auto border-t py-6">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 text-center text-xs text-muted-foreground space-y-1">
           <p>
-            Autotunnel v1.0.1 · 基于 GPL-2.0 协议开源 · 前端复刻自 edt-pages.github.io ·
+            Autotunnel v1.0.3 · 基于 GPL-2.0 协议开源 · 前端复刻自 edt-pages.github.io ·
             核心服务版权归原项目所有 · 仅供学习研究，请务必遵守当地法律法规
           </p>
         </div>

@@ -1,8 +1,14 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// autotunnel — 数据库 schema(v1.0.3)
+//
+// 运行时存储真源说明(与 cmliu/edgetunnel 的 KV 语义一致):
+//   - worker 核心经 env.KV.get/put/delete 读写全部业务数据
+//     (config.json / cf.json / tg.json / log.json / ADD.txt 键)。
+//   - Node 模式: node:sqlite(storage.ts)在 DATABASE_URL 指向的文件上
+//     运行时 CREATE TABLE IF NOT EXISTS kv(...); 本文件即该表的结构文档。
+//   - Cloudflare D1 模式: pages-deploy.yml 推送 server/schema.sql 建表
+//     (含 updated_at 审计列, INSERT OR IGNORE 幂等)。
+//   - prisma client 不参与运行时; DATABASE_URL 相对路径按 Prisma 约定
+//     相对本目录解析(file:./avatar-nuxt.db → prisma/avatar-nuxt.db)。
 
 generator client {
   provider = "prisma-client-js"
@@ -13,20 +19,9 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model Post {
-  id        String   @id @default(cuid())
-  title     String
-  content   String?
-  published Boolean  @default(false)
-  authorId  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+// 与 server/schema.sql / storage.ts 的 kv 表一致
+model kv {
+  key        String  @id
+  value      String?
+  updated_at Int?
 }

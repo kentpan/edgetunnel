@@ -9,11 +9,14 @@
  *   - env: ADMIN_SECRET → 管理员密码映射(用户约定), 存储经 storage.ts 自动适配
  *   - request: Node 下附加 cf 占位 / fetcher.connect(node:net/tls) / WS早期数据
  *   - ctx: waitUntil 收集器
+ *   - cf.json: 未配置且服务端持有 CLOUDFLARE_API_TOKEN 时自动写入部署默认凭据
+ *     (ensureDeployDefaultCredentials, v1.0.3 源头修复 —— 核心原版 getCloudflareUsage
+ *     随后携凭据直查 Cloudflare GraphQL, 面板请求统计模块开箱显示)
  */
 
 import './project-env'; // .env 唯一数据源, 先于一切装配
 import { resolveKV, currentKVDriver } from './storage';
-import { applyDefaultCfUsageCredential } from './cf-usage';
+import { ensureDeployDefaultCredentials } from './cf-usage';
 import {
   ensureMd5Support,
   ensureWsResponseSupport,
@@ -21,8 +24,8 @@ import {
   placeholderCf,
 } from './node-shims';
 
-// 字节一致的核心模块(内容与 docs/edgetunnel/_worker.js 完全相同)
-// @ts-expect-error — 无类型声明的 ESM 模块(逐字保留原文件)
+// 字节一致的核心模块(内容与 docs/edgetunnel/_worker.js 完全相同; allowJs
+// 环境下直接从 .mjs 推导类型, 无需额外声明)
 import coreModule from '@/lib/core/worker-core.mjs';
 
 interface CoreFetcher {
@@ -41,6 +44,10 @@ export async function buildCoreEnv(): Promise<{
   storageDriver: string;
 }> {
   const kv = await resolveKV();
+  // cf.json 部署默认凭据自动初始化(v1.0.3): 未配置且持有 CLOUDFLARE_API_TOKEN
+  // 时写入 AccountID+APIToken, 核心原版 getCloudflareUsage 直查 CF GraphQL。
+  // 状态机内置 60s 复检周期与失败退避, 常规请求零额外 KV 读。
+  await ensureDeployDefaultCredentials(kv);
   const env: Record<string, unknown> = {
     // 存储绑定(自动适配: KV绑定 → D1 → node:sqlite → 内存)
     KV: kv,
@@ -109,7 +116,7 @@ async function prepareCoreRequest(request: Request): Promise<Request> {
     md5Ready = true;
   }
   // workerd 原生请求(cf/fetcher 天然存在) → 原样直通
-  const asAny = request as unknown as { cf?: unknown; fetcher?: unknown };
+  const asAny = request as unknown as { cf?: unknown; fetcher?: { connect?: unknown } };
   if (isWorkerdRequest(request) && asAny.fetcher && typeof asAny.fetcher.connect === 'function') {
     return request;
   }
@@ -154,9 +161,7 @@ function resolveCoreFetcher(): CoreFetcher {
  */
 export async function invokeCore(request: Request): Promise<Response> {
   const { env } = await buildCoreEnv();
-  // 部署默认凭据注入: /admin/getCloudflareUsage 空凭据时补 CLOUDFLARE_API_TOKEN
-  const usageAdapted = await applyDefaultCfUsageCredential(request, env);
-  const coreRequest = await prepareCoreRequest(usageAdapted);
+  const coreRequest = await prepareCoreRequest(request);
   const ctx = makeCtx();
   const core = resolveCoreFetcher();
   try {

@@ -1,19 +1,32 @@
 /**
  * cf-usage.ts — Cloudflare Workers/Pages 可用请求数统计适配层
  *
- * 需求: 管理后台"请求统计"**默认**使用部署时配置的 CLOUDFLARE_API_TOKEN
- * (GitHub Actions Secrets → Pages env_vars 自动注入 / Node .env 配置),
- * 管理员无需在后台手动填写任何凭据即可查看当日请求配额。
+ * v1.0.3 源头修复: 管理面板"Workers/Pages 请求使用情况"模块开箱即显示。
  *
- * 核心零改动 —— 两个注入点全部在适配侧:
- *   ① 模态框"可用性验证": /admin/getCloudflareUsage 请求缺凭据时重写 URL,
- *      注入 APIToken / AccountID(applyDefaultCfUsageCredential, invokeCore
- *      与 CF Pages 门控调用), 由核心原版 getCloudflareUsage 完成查询。
- *   ② 面板统计展示: cf.json 的 UsageAPI 指向内置端点 /autotunnel/cf-usage,
- *      核心(config.json 加载)原样 fetch 该端点 → queryCfUsage 走
- *      Cloudflare GraphQL API(与核心 getCloudflareUsage 同款查询/同构返回),
- *      60s 内存缓存避免高频调用。
+ * 根因(v1.0.2): 模块显示条件 = 核心 config_JSON.CF.Usage.success(与
+ * cmliu/edgetunnel 完全一致), 而 Usage 由核心读取 KV 中 cf.json 决定:
+ *   - cf.json.UsageAPI 非空 → 核心 fetch(UsageAPI)
+ *   - 否则 → 核心 getCloudflareUsage(Email, GlobalAPIKey, AccountID, APIToken)
+ * v1.0.2 的 cf.json 初始为全空(核心首载写入 {Email:null,...,UsageAPI:null}),
+ * 需管理员进后台弹窗手动验证+保存才写入凭据 —— 与"部署即自动可用"的
+ * 文档承诺不符, 模块因此不显示。
+ *
+ * 修复(从源头, 零垫片): 服务端持有部署凭据时(CLOUDFLARE_API_TOKEN, 经
+ * GitHub Actions Secrets → Pages env_vars 注入 / Node .env 配置), 在
+ * cf.json **未配置**(五个字段全空)时自动写入部署默认凭据:
+ *   { Email:null, GlobalAPIKey:null, AccountID:<解析>, APIToken:<token>, UsageAPI:null }
+ * 此后数据获取与 cmliu/edgetunnel **完全一致** —— 由核心原版
+ * getCloudflareUsage 携凭据直查 Cloudflare GraphQL API(AccountWorkers
+ * InvocationsAdaptive, UTC 零点起算), 前端模块 UI 亦为上游原样字节。
+ * 管理员后续在后台显式配置(UsageAPI / Account ID + API Token /
+ * Email + Global API Key)时, 已配置状态优先, 自动初始化不再介入;
+ * 清空配置后最多 60s(状态复检周期)自动恢复部署默认凭据。
+ *
+ * 存储一致性: 初始化经 env.KV 同一接口写入(get/put), Cloudflare KV
+ * 绑定 / D1(kv 表) / node:sqlite(kv 表) / 内存四种后端行为完全一致,
+ * 与 cmliu/edgetunnel 的 cf.json 语义(KV get/put + 同构 JSON)对齐。
  */
+import type { KVLike } from './storage';
 
 /** 与核心 getCloudflareUsage 同构的返回结构 */
 export interface CfUsageResult {
@@ -23,6 +36,15 @@ export interface CfUsageResult {
   total: number;
   max: number;
   msg?: string;
+}
+
+/** cf.json 结构(与 cmliu/edgetunnel 完全一致的字段集) */
+interface CfJsonShape {
+  Email: string | null;
+  GlobalAPIKey: string | null;
+  AccountID: string | null;
+  APIToken: string | null;
+  UsageAPI: string | null;
 }
 
 /** 运行时 env 三层兜底: 显式参数 > process.env(Node/OpenNext env proxy) > 门控挂载的 env */
@@ -76,6 +98,7 @@ export async function resolveAccountId(token: string): Promise<string> {
 /**
  * 查询当日 Workers/Pages 请求用量 —— 与核心 getCloudflareUsage 完全同款:
  * GraphQL AccountWorkersInvocationsAdaptive, UTC 零点起算, 返回同构结构。
+ * (/autotunnel/cf-usage 诊断端点使用; 面板展示走核心原版 getCloudflareUsage)
  */
 export async function queryCfUsage(opts?: {
   token?: string;
@@ -152,39 +175,91 @@ export async function queryCfUsage(opts?: {
   }
 }
 
-/** 路径是否为核心"查询请求量"端点(核心按区分大小写匹配) */
-export function isCfUsageVerifyPath(pathname: string): boolean {
-  return pathname.replace(/^\/+/, '') === 'admin/getCloudflareUsage';
+/* ------------------------------------------------------------------ */
+/* 部署默认凭据自动初始化(核心零改动的源头修复)                          */
+/* ------------------------------------------------------------------ */
+
+const CF_INIT_STATE_TTL = 60 * 1000; // 已知状态复检周期(检出管理员清空/显式配置)
+const CF_INIT_RETRY_BACKOFF = 30 * 1000; // 初始化尝试失败后的退避窗口
+
+let lastCheckTs = 0; // 上次实际读取 cf.json 的时间
+let lastInitAttemptTs = 0; // 上次初始化尝试时间(仅失败退避用)
+let knownState: 'unknown' | 'configured' | 'unset' = 'unknown';
+
+/** cf.json 是否"未配置"(五个字段全空/缺省) —— 视为可安全写入部署默认凭据 */
+function isUnconfigured(cf: Partial<CfJsonShape> | null | undefined): boolean {
+  if (!cf) return true;
+  return ![cf.Email, cf.GlobalAPIKey, cf.AccountID, cf.APIToken, cf.UsageAPI].some(
+    (v) => v !== null && v !== undefined && String(v).trim() !== '',
+  );
 }
 
 /**
- * ① 模态框验证注入: /admin/getCloudflareUsage 请求未携带任何凭据时,
- * 注入部署默认 CLOUDFLARE_API_TOKEN(+Account ID 自动解析)后交还核心。
- * 已带凭据(GlobalAPIKey / APIToken)的请求原样透传, 核心行为不变。
+ * 部署默认凭据自动初始化 —— cf.json 未配置且服务端持有
+ * CLOUDFLARE_API_TOKEN 时, 写入 {AccountID, APIToken}(AccountID 经
+ * CLOUDFLARE_ACCOUNT_ID 或 Token 自动探测解析)。写入经 KV 接口,
+ * KV/D1/node:sqlite/内存后端行为一致; 核心 getCloudflareUsage 随后
+ * 原版直查 Cloudflare GraphQL, 面板模块开箱显示。
+ *
+ * 幂等/并发安全: 每次写入前重读 cf.json, 已配置(任意字段非空)不覆盖;
+ * 多进程/多 isolate 重复写入内容一致, 无害。初始化失败(网络/权限等)
+ * 不抛出、不影响核心服务, 按退避窗口静默重试。
  */
-export async function applyDefaultCfUsageCredential(
-  request: Request,
-  env?: Record<string, unknown>,
-): Promise<Request> {
+export async function ensureDeployDefaultCredentials(kv: KVLike): Promise<void> {
   try {
-    const url = new URL(request.url);
-    if (!isCfUsageVerifyPath(url.pathname)) return request;
-    if (url.searchParams.get('APIToken') || url.searchParams.get('GlobalAPIKey')) return request;
+    const token = pickToken();
+    const now = Date.now();
 
-    const token =
-      (env?.CLOUDFLARE_API_TOKEN as string) || pickToken();
-    if (!token) return request;
+    // ① 状态新鲜(60s 内已确认"已配置", 或已确认"未配置且无 token")→ 跳过
+    const stateFresh = knownState !== 'unknown' && now - lastCheckTs < CF_INIT_STATE_TTL;
+    if (stateFresh && !(knownState === 'unset' && token)) return;
+    // ② "未配置 + 有 token"的初始化重试退避(30s)
+    if (
+      knownState === 'unset' &&
+      token &&
+      lastInitAttemptTs > 0 &&
+      now - lastInitAttemptTs < CF_INIT_RETRY_BACKOFF
+    ) {
+      return;
+    }
 
-    let accountId =
-      url.searchParams.get('AccountID') ||
-      (env?.CLOUDFLARE_ACCOUNT_ID as string) ||
-      pickAccountId();
+    lastCheckTs = now;
+
+    // 每次都重读(而非依赖内存状态): 管理员可能随时显式配置/清空
+    let cf: Partial<CfJsonShape> | null = null;
+    try {
+      const raw = await kv.get('cf.json');
+      if (raw) cf = JSON.parse(raw) as Partial<CfJsonShape>;
+    } catch {
+      cf = null; // 损坏的 cf.json 视为未配置
+    }
+
+    if (!isUnconfigured(cf)) {
+      knownState = 'configured';
+      return;
+    }
+    knownState = 'unset';
+    if (!token) return; // 无部署凭据 → 保持未配置(与原版一致)
+
+    if (lastInitAttemptTs > 0 && now - lastInitAttemptTs < CF_INIT_RETRY_BACKOFF) return;
+    lastInitAttemptTs = now;
+
+    let accountId = pickAccountId();
     if (!accountId) accountId = await resolveAccountId(token);
+    if (!accountId) return; // 探测失败 → 退避窗口后重试
 
-    url.searchParams.set('APIToken', token);
-    if (accountId) url.searchParams.set('AccountID', accountId);
-    return new Request(url.toString(), request);
-  } catch {
-    return request;
+    const initialized: CfJsonShape = {
+      Email: null,
+      GlobalAPIKey: null,
+      AccountID: accountId,
+      APIToken: token,
+      UsageAPI: null,
+    };
+    await kv.put('cf.json', JSON.stringify(initialized, null, 2));
+    knownState = 'configured';
+    console.log('[autotunnel/cf-usage] cf.json 未配置 → 已写入部署默认凭据(CLOUDFLARE_API_TOKEN), 请求统计开箱可用');
+  } catch (e) {
+    // 初始化失败不影响核心服务(与未配置时行为一致, 模块不显示)
+    console.warn('[autotunnel/cf-usage] 部署默认凭据初始化失败:', (e as Error)?.message);
   }
 }

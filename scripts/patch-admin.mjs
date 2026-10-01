@@ -8,9 +8,11 @@
  *
  * 改造清单:
  *   [v1.0.1] P1 下拉框三角箭头 + 展开翻转动画(纯 CSS, 双层 SVG 背景交叉滑动)
- *   [v1.0.1] P2-P6 请求统计弹窗新增"🚀 部署默认凭据"方案并设为默认:
- *            option 项 / deploySection 提示块 / 默认选中 / 显示切换分支 /
- *            保存时 UsageAPI 指向内置统计端点 /autotunnel/cf-usage
+ *   [v1.0.3] 移除 v1.0.1 P2-P6 请求统计弹窗"🚀 部署默认凭据"方案:
+ *            部署凭据改为 cf.json 自动初始化(src/lib/adapter/cf-usage.ts,
+ *            核心 getCloudflareUsage 原版查询), 统计弹窗恢复上游原版
+ *            三方案(UsageAPI / Account ID + API Token / Email + Global API Key)
+ *            与默认选中 accountid —— 与 cmliu/edgetunnel 完全一致。
  *   [v1.0.2] P7-P9 版本信息弹窗改造: 移除"复制最新Worker.js源码"与
  *            "下载最新Pages.zip源码 上传部署"两按钮, 原位新增
  *            "🚀 一键更新发布"(点击 → POST /autotunnel/trigger-sync →
@@ -67,23 +69,12 @@ const ARROW_CSS = [
 ].join('\n');
 
 // ═══════════════════════════════════════════════════════════════════
-// [v1.0.1] P2/P3 — 统计方案 deploy 选项 + 提示块
+// [v1.0.3] P2-P6 已移除 —— 请求统计弹窗保持上游原版三方案。
+// 部署默认凭据(CLOUDFLARE_API_TOKEN)改由服务端 cf.json 自动初始化
+// (src/lib/adapter/cf-usage.ts ensureDeployDefaultCredentials), 核心
+// getCloudflareUsage 原版携凭据直查 Cloudflare GraphQL —— UI 与数据
+// 获取均与 cmliu/edgetunnel 完全一致, 无需前端方案项。
 // ═══════════════════════════════════════════════════════════════════
-const DEPLOY_OPTION_HTML = '\t\t\t\t\t<option value="deploy" selected>🚀 部署默认凭据（CLOUDFLARE_API_TOKEN）</option>\n';
-
-const DEPLOY_SECTION_HTML = [
-  '\t\t\t<!-- 部署默认凭据方案(autotunnel) -->',
-  '\t\t\t<div id="cloudflareDeploySection" class="hidden-section">',
-  '\t\t\t\t<div class="form-group subapi-form-group">',
-  '\t\t\t\t\t<small style="font-size: 12px; color: #9ca3af; line-height: 1.9; display: block;">🚀',
-  '\t\t\t\t\t\t无需填写任何凭据 —— 服务端自动使用部署时注入的 <b>CLOUDFLARE_API_TOKEN</b>(GitHub',
-  '\t\t\t\t\t\tActions Secrets / .env 配置)查询本账户 Workers/Pages 当日请求配额。<br>💡 Token',
-  '\t\t\t\t\t\t权限需包含 "Account Analytics: Read"; Node.js 部署在 .env 配置',
-  '\t\t\t\t\t\tCLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID 即可。</small>',
-  '\t\t\t\t</div>',
-  '\t\t\t</div>',
-  '',
-].join('\n');
 
 // ═══════════════════════════════════════════════════════════════════
 // [v1.0.2] P7 — 一键更新发布按钮(插入 version-info-actions 顶部)
@@ -186,51 +177,8 @@ export function patchAdminPage(html) {
     note(false, '未找到 </style>, 未能插入下拉框箭头 CSS');
   }
 
-  // ── [v1.0.1] P2 统计方案新增"部署默认凭据"选项(置顶+默认选中) ────────
-  out = replaceOnce(
-    out,
-    '\t\t\t\t\t<option id="usageapiOption" value="usageapi">',
-    `${DEPLOY_OPTION_HTML}\t\t\t\t\t<option id="usageapiOption" value="usageapi">`,
-    '统计方案下拉已插入"🚀 部署默认凭据"选项(默认选中)',
-  );
-
-  // ── [v1.0.1] P3 deploySection 提示块(验证状态提示之前) ───────────────
-  out = replaceOnce(
-    out,
-    '\t\t\t<!-- 验证状态提示 -->',
-    `${DEPLOY_SECTION_HTML}\t\t\t<!-- 验证状态提示 -->`,
-    '已插入"部署默认凭据"方案提示块(cloudflareDeploySection)',
-  );
-
-  // ── [v1.0.1] P4 打开统计弹窗时默认选中 deploy 方案 ───────────────────
-  out = replaceOnce(
-    out,
-    "\t\t\t// 默认选择第一个方案\n\t\t\tdocument.getElementById('cloudflareAuthMethod').value = 'accountid';",
-    "\t\t\t// 默认选择部署默认凭据方案(autotunnel: 服务端 CLOUDFLARE_API_TOKEN)\n\t\t\tdocument.getElementById('cloudflareAuthMethod').value = 'deploy';",
-    '统计弹窗默认方案已切换为"部署默认凭据"',
-  );
-
-  // ── [v1.0.1] P5 updateCloudflareAuthMethod 增加 deploy 分支 ──────────
-  out = replaceOnce(
-    out,
-    "\t\t\tdocument.getElementById('cloudflareUsageAPISection').style.display = 'none';",
-    "\t\t\tdocument.getElementById('cloudflareUsageAPISection').style.display = 'none';\n\t\t\tdocument.getElementById('cloudflareDeploySection').style.display = 'none';",
-    '方案切换函数已加入 deploy 隐藏分支',
-  );
-  out = replaceOnce(
-    out,
-    "\t\t\t} else if (method === 'usageapi') {\n\t\t\t\tdocument.getElementById('cloudflareUsageAPISection').style.display = 'block';\n\t\t\t}",
-    "\t\t\t} else if (method === 'usageapi') {\n\t\t\t\tdocument.getElementById('cloudflareUsageAPISection').style.display = 'block';\n\t\t\t} else if (method === 'deploy') {\n\t\t\t\tdocument.getElementById('cloudflareDeploySection').style.display = 'block';\n\t\t\t}",
-    '方案切换函数已加入 deploy 显示分支',
-  );
-
-  // ── [v1.0.1] P6 confirmCloudflareConfig 增加 deploy payload ──────────
-  out = replaceOnce(
-    out,
-    "\t\t\t\tlet payload;\n\t\t\t\tif (method === 'usageapi') {",
-    "\t\t\t\tlet payload;\n\t\t\t\tif (method === 'deploy') {\n\t\t\t\t\t// 部署默认凭据(autotunnel): UsageAPI 指向内置统计端点,\n\t\t\t\t\t// 核心 fetch 即得服务端 CLOUDFLARE_API_TOKEN 的请求量统计\n\t\t\t\t\tpayload = {\n\t\t\t\t\t\tEmail: null,\n\t\t\t\t\t\tGlobalAPIKey: null,\n\t\t\t\t\t\tAccountID: null,\n\t\t\t\t\t\tAPIToken: null,\n\t\t\t\t\t\tUsageAPI: location.origin + '/autotunnel/cf-usage'\n\t\t\t\t\t};\n\t\t\t\t} else if (method === 'usageapi') {",
-    '保存逻辑已加入 deploy 分支(UsageAPI → /autotunnel/cf-usage)',
-  );
+  // ── [v1.0.3] P2-P6 已移除: 统计弹窗保持上游原版三方案(部署凭据改由 ──
+  //    服务端 cf.json 自动初始化, 见 src/lib/adapter/cf-usage.ts) ────────
 
   // ── [v1.0.2] P7 移除"复制最新Worker.js源码"按钮 ──────────────────────
   const copyBtnRe = /<button type="button" id="versionCopyBtn"[^>]*>[\s\S]*?<\/button>/;

@@ -1,10 +1,11 @@
 /**
- * /autotunnel/cf-usage — 部署默认凭据的 Workers/Pages 用量统计端点
+ * /autotunnel/cf-usage — Workers/Pages 用量统计诊断端点
  *
- * 管理后台选择"部署默认凭据"方案保存后, cf.json 的 UsageAPI 指向本端点;
- * worker 核心(config.json 加载时)原样 fetch 该地址并解析 JSON, 面板即展示
- * 当日 Cloudflare Workers/Pages 请求配额 —— 核心零改动, 凭据由服务端持有
- * (GitHub Actions Secrets 注入 Pages env_vars / Node .env), 不暴露给前端。
+ * v1.0.3 起面板统计走核心原版 getCloudflareUsage(cf.json 部署默认凭据
+ * 由服务端自动初始化, 见 src/lib/adapter/cf-usage.ts), 本端点保留作
+ * **诊断用途**: 直接使用部署凭据(CLOUDFLARE_API_TOKEN)查询当日
+ * Workers/Pages 请求用量, 返回与核心 getCloudflareUsage 完全同构的
+ * { success, pages, workers, total, max }, 供排查 Token 权限/有效性。
  *
  * 返回结构与核心 getCloudflareUsage 完全同构: { success, pages, workers, total, max }
  */
