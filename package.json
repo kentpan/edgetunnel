@@ -1,8 +1,8 @@
 {
   "name": "autotunnel",
-  "version": "1.0.3",
+  "version": "1.0.5",
   "private": false,
-  "description": "Autotunnel — 基于 Next.js 重构的 edgetunnel: 前端原样复刻, worker 服务端核心保持原版, 支持 Cloudflare Pages(KV/D1) 与 Node.js(node:sqlite) 自动适配; v1.0.3 请求统计开箱即用(cf.json 部署默认凭据自动初始化)",
+  "description": "Autotunnel — 基于 Next.js 重构的 edgetunnel: 前端原样复刻, worker 服务端核心保持原版, 支持 Cloudflare Pages(KV/D1) 与 Node.js(node:sqlite) 自动适配; v1.0.5 统计面板 Token 权限预检+诊断指引+轮换自愈(Account Analytics:Read)",
   "license": "GPL-2.0",
   "homepage": "https://github.com/cmliu/edgetunnel",
   "repository": {

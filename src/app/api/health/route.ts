@@ -18,7 +18,7 @@ export async function GET() {
   })();
   return NextResponse.json({
     name: 'autotunnel',
-    version: '1.0.3',
+    version: '1.0.5',
     runtime,
     storage: { driver: currentKVDriver() || kv.driverName, resolved: storageDriver },
     adminConfigured: Boolean(
