@@ -5,11 +5,16 @@
 # 由 scripts/sync-upstream.mjs 一站式完成:
 #   ① 拉取上游 _worker.js(raw 直连, 失败自动切换 gh-proxy 镜像)
 #   ② sha256 对比 → 有差异覆盖根文件, 无差异零改动
-#   ③ 调 prepare-core.mjs 刷新运行时核心副本(worker-core.mjs / version.gen.ts,
-#      副本内容稳定: 核心未变则不产生 git 变更, 不会误触发发布)
+#   ③ 强制对齐运行时核心副本(worker-core.mjs 必须与 _worker.js 字节一致,
+#      防止手动更新核心后副本脱节导致部署产物版本陈旧)
+#   ④ 解析核心 Pages静态页面 常量 → 重新抓取前端五页面对比刷新
+#   ⑤ 任一文件变化 → 重新运行 embed-pages.mjs 重新生成嵌入模块
+#      (内含 v1.0.2 管理面板编译期改造: 一键更新发布按钮)
 # 有变更 → commit + push → 以 job 级 uses 调用 pages-deploy.yml 发布
 # (GitHub 仅允许 job 级调用可复用工作流; workflow_call 规避 GITHUB_TOKEN
-# push 事件不触发其他工作流的递归限制)。
+# push 事件不触发其他工作流的递归限制)。deploy 显式 checkout 同步后的
+# synced_sha(v2.0.3): 可复用工作流默认 checkout 触发时 github.sha, 会导致
+# 本次同步的新代码永远落后一个 run 才被部署。
 #
 # 上游来源: 仓库 Variable UPSTREAM_REPO > deploy.config.js upstreamRepo >
 #   默认 kentpan/edgetunnel; 分支: Variable UPSTREAM_BRANCH > main。
@@ -42,6 +47,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       updated: ${{ steps.commit.outputs.updated }}
+      synced_sha: ${{ steps.commit.outputs.synced_sha }}
     steps:
       - uses: actions/checkout@v4
 
@@ -59,12 +65,14 @@ jobs:
           git config user.email "actions@github.com"
           if [ -z "$(git status --porcelain)" ]; then
             echo "updated=false" >> "$GITHUB_OUTPUT"
+            echo "synced_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
             echo "✓ 核心已与上游一致, 无需发布"
           else
             git add -A
             git commit -m "sync: 上游 _worker.js 更新 ($(date -u +'%F %T UTC'))"
             git push
             echo "updated=true" >> "$GITHUB_OUTPUT"
+            echo "synced_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
             echo "✓ 上游更新已推送, 触发发布"
           fi
 
@@ -75,4 +83,5 @@ jobs:
     uses: ./.github/workflows/pages-deploy.yml
     with:
       project_name: ''
+      checkout_ref: ${{ needs.sync.outputs.synced_sha }}
     secrets: inherit

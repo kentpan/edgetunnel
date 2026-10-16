@@ -9,9 +9,10 @@
  *      → 有更新则同步进本项目 → commit → 直接调用部署工作流发布。
  *
  * 凭据(双运行时, 与部署方式对齐):
- *   Cloudflare Pages: 工作流注入 AUTOSYNC_TOKEN(缺省回落 Actions GITHUB_TOKEN,
- *     workflow_dispatch 属 GITHUB_TOKEN 例外事件, 可正常创建 run)+
- *     GH_REPOSITORY(部署时自动写入);
+ *   Cloudflare Pages: AUTOSYNC_TOKEN(仓库 secret, PAT)由部署工作流注入
+ *     (Actions 内置 GITHUB_TOKEN 随运行结束过期, 不作回落) + GH_REPOSITORY/
+ *     UPSTREAM_REPO 写入生成 wrangler.toml [vars](v2.0.2: 新版 wrangler deploy
+ *     会同步 [vars] 替换 plain vars, 变量必须在 toml 内才能存活);
  *   Node.js: .env 配置 AUTOSYNC_TOKEN(PAT, 需 Actions: write)+ GH_REPOSITORY。
  *
  * GET 返回当前触发链路配置状态(不回显 token), 供排障。
@@ -33,6 +34,55 @@ interface SyncConfig {
   branch: string;
 }
 
+interface LatestRun {
+  runNumber: number;
+  status: string;
+  conclusion: string;
+  createdAt: string;
+  htmlUrl: string;
+  active: boolean;
+}
+
+/** 查询最新一次工作流运行(token 可用则鉴权, 降级匿名; 失败返回 null) */
+async function fetchLatestRun(cfg: Pick<SyncConfig, 'repository' | 'workflow' | 'token'>): Promise<LatestRun | null> {
+  if (!cfg.repository) return null;
+  try {
+    const headers: Record<string, string> = {
+      Accept: 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
+      'User-Agent': 'autotunnel-trigger-sync',
+    };
+    if (cfg.token) headers.Authorization = `Bearer ${cfg.token}`;
+    const res = await fetch(
+      `https://api.github.com/repos/${cfg.repository}/actions/workflows/${cfg.workflow}/runs?per_page=1`,
+      { headers, signal: AbortSignal.timeout(10_000) },
+    );
+    if (!res.ok) return null;
+    const body = (await res.json()) as {
+      workflow_runs?: Array<{
+        run_number: number;
+        status: string;
+        conclusion: string | null;
+        created_at: string;
+        html_url: string;
+      }>;
+    };
+    const run = body.workflow_runs?.[0];
+    if (!run) return null;
+    const active = run.status === 'queued' || run.status === 'in_progress';
+    return {
+      runNumber: run.run_number,
+      status: run.status,
+      conclusion: run.conclusion ?? '',
+      createdAt: run.created_at,
+      htmlUrl: run.html_url,
+      active,
+    };
+  } catch {
+    return null;
+  }
+}
+
 /** 汇总一键更新发布的触发凭据(缺失项原样空串, 由调用侧判定) */
 function readSyncConfig(): SyncConfig {
   const pick = (...keys: string[]): string => {
@@ -43,7 +93,9 @@ function readSyncConfig(): SyncConfig {
     return '';
   };
   return {
-    token: pick('AUTOSYNC_TOKEN', 'GH_PAT', 'GITHUB_TOKEN'),
+    // v2.0.2: 不回落 GITHUB_TOKEN —— Actions 内置 token 随运行结束即过期,
+    // 构建期还可能被内联/注入成死凭据造成 401 假故障; 未配置时如实上报缺失
+    token: pick('AUTOSYNC_TOKEN', 'GH_PAT'),
     repository: pick('GH_REPOSITORY', 'AUTOSYNC_REPO'),
     workflow: pick('AUTOSYNC_WORKFLOW') || DEFAULT_WORKFLOW,
     branch: pick('AUTOSYNC_BRANCH') || DEFAULT_BRANCH,
@@ -106,6 +158,7 @@ async function dispatchWorkflow(cfg: SyncConfig): Promise<{ ok: boolean; status:
 export async function GET(req: NextRequest) {
   void req;
   const cfg = readSyncConfig();
+  const latestRun = await fetchLatestRun(cfg);
   return NextResponse.json(
     {
       ok: true,
@@ -113,6 +166,7 @@ export async function GET(req: NextRequest) {
       repository: cfg.repository || null,
       workflow: cfg.workflow,
       branch: cfg.branch,
+      latestRun,
       hints: {
         tokenMissing: !cfg.token,
         repositoryMissing: !cfg.repository,
@@ -141,14 +195,29 @@ export async function POST(req: NextRequest) {
         error: 'missing_credentials',
         message: !cfg.repository
           ? '未配置 GH_REPOSITORY(owner/repo) —— Pages 部署由工作流自动注入; Node 部署请在 .env 配置'
-          : '未配置 AUTOSYNC_TOKEN —— Cloudflare Pages 部署由工作流注入(缺省回落 Actions GITHUB_TOKEN); Node 部署请在 .env 配置 GitHub PAT(需 Actions: write 权限)',
+          : '未配置 AUTOSYNC_TOKEN —— 请在仓库 Secrets 配置 GitHub PAT(Actions: write 权限, 变量名 AUTOSYNC_TOKEN)后重新部署; Node 部署写入 .env',
         missing: [!cfg.repository && 'GH_REPOSITORY', !cfg.token && 'AUTOSYNC_TOKEN'].filter(Boolean),
       },
       { status: 400, headers: { 'Cache-Control': 'no-store' } },
     );
   }
 
-  // 3) 触发同步+发布工作流
+  // 3) 防重复触发: 已有运行中/排队中的同步任务时拒绝(以 GitHub run 状态为唯一真源,
+  //    不引入本地状态 —— Pages 多实例/重启均安全)
+  const running = await fetchLatestRun(cfg);
+  if (running?.active) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: 'sync_in_progress',
+        message: `已有更新任务进行中(run #${running.runNumber}, ${running.status}) —— 请等待其完成, 勿重复触发`,
+        latestRun: running,
+      },
+      { status: 409, headers: { 'Cache-Control': 'no-store' } },
+    );
+  }
+
+  // 4) 触发同步+发布工作流
   const result = await dispatchWorkflow(cfg);
   if (!result.ok) {
     const friendly =

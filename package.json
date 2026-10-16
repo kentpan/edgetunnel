@@ -1,6 +1,6 @@
 {
   "name": "autotunnel",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "private": false,
   "description": "Autotunnel — 基于 Next.js 重构的 edgetunnel: 前端原样复刻, worker 服务端核心保持原版, 支持 Cloudflare Pages(KV/D1) 与 Node.js(node:sqlite) 自动适配; v1.0.5 请求统计开箱即用(Token 需 Account Analytics:Read)",
   "license": "GPL-2.0",

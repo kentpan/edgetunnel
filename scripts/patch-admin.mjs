@@ -85,14 +85,86 @@ const ONE_CLICK_BUTTON_HTML = [
 ].join('\n');
 
 // ═══════════════════════════════════════════════════════════════════
-// [v1.0.2] P8 — triggerOneClickDeploy() 函数(插入 openLatestPagesZipDownload 前)
+// [v2.0.3] P8 — 一键更新发布状态机(插入 openLatestPagesZipDownload 前)
+//   触发后不关弹窗, 轮询 GET /autotunnel/trigger-sync 的 latestRun:
+//   queued/in_progress → 按钮禁用+进度文案; success → 提示刷新;
+//   failure → 提示失败可重试。打开弹窗时自动探测进行中的部署(P10 hook)。
 // ═══════════════════════════════════════════════════════════════════
 const ONE_CLICK_FUNCTION_JS = [
+  '                function isRunActive(run) {',
+  "                        return !!run && (run.status === 'queued' || run.status === 'in_progress');",
+  '                }',
+  '',
+  '                async function fetchOneClickDeployState() {',
+  '                        try {',
+  "                                const res = await fetch('/autotunnel/trigger-sync', { headers: { 'Accept': 'application/json' } });",
+  '                                if (!res.ok) return null;',
+  '                                return await res.json();',
+  '                        } catch (error) {',
+  '                                return null;',
+  '                        }',
+  '                }',
+  '',
+  '                function setOneClickDeployBusy(btn, busy, label) {',
+  '                        if (!btn) return;',
+  '                        if (busy) {',
+  '                                btn.disabled = true;',
+  "                                btn.dataset.deployBusy = '1';",
+  "                                btn.innerHTML = label || '⏳ 部署进行中...';",
+  '                        } else {',
+  '                                btn.disabled = false;',
+  "                                btn.dataset.deployBusy = '0';",
+  "                                btn.innerHTML = '🚀 一键更新发布';",
+  '                        }',
+  '                }',
+  '',
+  '                function pollOneClickDeploy(btn) {',
+  '                        if (window.__oneClickPollTimer) clearTimeout(window.__oneClickPollTimer);',
+  '                        let probes = 0;',
+  '                        const tick = async () => {',
+  '                                probes += 1;',
+  '                                const data = await fetchOneClickDeployState();',
+  '                                const run = data && data.latestRun;',
+  '                                if (isRunActive(run)) {',
+  "                                        btn.innerHTML = '⏳ 部署进行中(run #' + run.runNumber + ')...';",
+  '                                        window.__oneClickPollTimer = setTimeout(tick, 15000);',
+  '                                        return;',
+  '                                }',
+  '                                if (run && run.conclusion === "success") {',
+  "                                        showToast('✅ 同步发布流程结束, 页面即将刷新以加载最新版本', 'success');",
+  '                                        setTimeout(() => location.reload(), 2000);',
+  '                                        return;',
+  '                                }',
+  '                                if (run && run.conclusion) {',
+  "                                        showToast('❌ 同步发布失败(' + run.conclusion + '), 可重新触发', 'error');",
+  '                                        setOneClickDeployBusy(btn, false);',
+  '                                        return;',
+  '                                }',
+  '                                if (probes < 40) {',
+  '                                        window.__oneClickPollTimer = setTimeout(tick, 15000);',
+  '                                        return;',
+  '                                }',
+  "                                showToast('⚠ 未能确认部署状态, 请稍后刷新页面核对版本', 'error');",
+  '                                setOneClickDeployBusy(btn, false);',
+  '                        };',
+  '                        tick();',
+  '                }',
+  '',
+  '                async function scheduleOneClickDeployStateProbe() {',
+  "                        const btn = document.getElementById('oneClickDeployBtn');",
+  "                        if (!btn || btn.dataset.deployBusy === '1') return;",
+  '                        const data = await fetchOneClickDeployState();',
+  '                        const run = data && data.latestRun;',
+  '                        if (isRunActive(run)) {',
+  "                                setOneClickDeployBusy(btn, true, '⏳ 部署进行中(run #' + run.runNumber + ')...');",
+  '                                pollOneClickDeploy(btn);',
+  '                        }',
+  '                }',
+  '',
   '                async function triggerOneClickDeploy() {',
   "                        const btn = document.getElementById('oneClickDeployBtn');",
   "                        if (!btn || btn.dataset.deployBusy === '1') return;",
   "                        btn.dataset.deployBusy = '1';",
-  '                        const originalHtml = btn.innerHTML;',
   '                        btn.disabled = true;',
   "                        btn.innerHTML = '⏳ 正在触发同步发布...';",
   '                        try {',
@@ -102,22 +174,29 @@ const ONE_CLICK_FUNCTION_JS = [
   "                                        body: '{}'",
   '                                });',
   '                                const data = await res.json().catch(() => ({}));',
-  "                                if (res.ok && (data.ok || data.success)) {",
-  "                                        showToast('✅ ' + (data.message || '已触发同步发布，GitHub Actions 正在检测上游更新并自动部署'), 'success');",
-  '                                        closeVersionInfoModal();',
+  '                                if (res.ok && (data.ok || data.success)) {',
+  "                                        showToast('✅ ' + (data.message || '已触发同步发布, 部署进行中'), 'success');",
+  "                                        btn.innerHTML = '⏳ 已触发, 部署进行中...';",
+  '                                        pollOneClickDeploy(btn);',
+  '                                } else if (res.status === 409 && data.latestRun) {',
+  "                                        showToast('ℹ ' + (data.message || '已有更新任务进行中'), 'info');",
+  "                                        btn.innerHTML = '⏳ 部署进行中(run #' + data.latestRun.runNumber + ')...';",
+  '                                        pollOneClickDeploy(btn);',
   '                                } else {',
   "                                        showToast('❌ 触发失败: ' + (data.message || data.error || ('HTTP ' + res.status)), 'error');",
+  '                                        setOneClickDeployBusy(btn, false);',
   '                                }',
   '                        } catch (error) {',
   "                                showToast('❌ 触发失败: ' + (error && error.message ? error.message : error), 'error');",
-  '                        } finally {',
-  '                                btn.disabled = false;',
-  "                                btn.dataset.deployBusy = '0';",
-  '                                btn.innerHTML = originalHtml;',
+  '                                setOneClickDeployBusy(btn, false);',
   '                        }',
   '                }',
   '',
 ].join('\n');
+
+// [v2.0.3] P10 — openVersionInfoModal 注入行(打开弹窗即探测进行中的部署)
+const OPEN_MODAL_HOOK_LINE = '                        scheduleOneClickDeployStateProbe();';
+
 
 // ═══════════════════════════════════════════════════════════════════
 // [v1.0.2] P9 — .btn-version-deploy 样式(插在 .btn-version-changelog 前)
@@ -213,15 +292,33 @@ export function patchAdminPage(html) {
 
   // ── [v1.0.2] P8 插入 triggerOneClickDeploy() 函数 ────────────────────
   const jsAnchor = 'function openLatestPagesZipDownload() {';
+  let oneClickJsReady = false;
   if (out.includes(jsAnchor)) {
     if (!out.includes('function triggerOneClickDeploy()')) {
       out = out.replace(jsAnchor, `${ONE_CLICK_FUNCTION_JS}${jsAnchor}`);
-      note(true, '已插入 triggerOneClickDeploy() 函数');
+      note(true, '已插入一键更新发布状态机(triggerOneClickDeploy + 轮询探测)');
+      oneClickJsReady = true;
     } else {
       note(true, 'triggerOneClickDeploy() 已存在(幂等跳过)');
+      oneClickJsReady = true;
     }
   } else {
     note(false, '未找到 openLatestPagesZipDownload 锚点, 未能插入触发函数');
+  }
+
+  // ── [v2.0.3] P10 打开弹窗时探测进行中的部署(仅状态机就位时注入) ──
+  if (oneClickJsReady) {
+    const modalAnchor = 'function openVersionInfoModal() {';
+    if (out.includes(modalAnchor)) {
+      if (!out.includes('scheduleOneClickDeployStateProbe();')) {
+        out = out.replace(modalAnchor, `${modalAnchor}\n${OPEN_MODAL_HOOK_LINE}`);
+        note(true, '已在 openVersionInfoModal 注入部署状态探测');
+      } else {
+        note(true, '部署状态探测已注入(幂等跳过)');
+      }
+    } else {
+      note(false, '未找到 openVersionInfoModal 锚点, 未能注入状态探测');
+    }
   }
 
   // ── [v1.0.2] P9 插入 .btn-version-deploy 样式 ────────────────────────

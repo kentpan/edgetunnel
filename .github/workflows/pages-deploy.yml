@@ -165,10 +165,20 @@ on:
         required: false
         default: ''
         type: string
+      checkout_ref:
+        description: 'checkout 引用(留空 = 触发时 github.sha; sync-upstream 调用时传同步后的最新 commit)'
+        required: false
+        default: ''
+        type: string
   workflow_dispatch:
     inputs:
       project_name:
         description: '项目名称(留空则读取 deploy.config.js)'
+        required: false
+        default: ''
+        type: string
+      checkout_ref:
+        description: 'checkout 引用(留空 = 触发时 github.sha)'
         required: false
         default: ''
         type: string
@@ -211,6 +221,11 @@ jobs:
       OWNER_TG: ${{ vars.OWNER_TG }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          # v2.0.3: sync-upstream workflow_call 调用时传同步后的 synced_sha ——
+          # 默认 github.sha 是 run 触发时的 head, 不含 sync job 刚 push 的代码,
+          # 否则每次部署的永远是"上一个 run 同步"的版本(永远慢一拍)
+          ref: ${{ inputs.checkout_ref || github.sha }}
 
       - name: Detect framework (Nuxt / Next)
         id: framework

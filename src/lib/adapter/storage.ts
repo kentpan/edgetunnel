@@ -7,7 +7,7 @@
  *   1. Cloudflare KV 绑定(env.KV / OpenNext getCloudflareContext) —— 线上首选
  *   2. Cloudflare D1 绑定(binding 名 "DB", kv 表) —— 仅配置 D1 的项目
  *   3. node:sqlite(本地 SQLite 文件) —— Node.js 模式; 文件路径唯一真源 =
- *      .env 的 DATABASE_URL(file:./avatar-nuxt.db → prisma/avatar-nuxt.db,
+ *      .env 的 DATABASE_URL(file:./prisma/auto-tunnel.db → prisma/auto-tunnel.db,
  *      相对路径按 Prisma 约定相对 schema 所在目录解析)
  *   4. 内存 Map —— 最终兜底(无持久化, 站点仍可运行)
  *
@@ -88,7 +88,7 @@ function resolveSqliteFile(): string | null {
     if (!p) return null;
     if (path.isAbsolute(p)) return p;
     // Prisma 约定: 相对路径相对 prisma/schema.prisma 所在目录解析
-    // file:./avatar-nuxt.db → prisma/avatar-nuxt.db
+    // file:./prisma/auto-tunnel.db → prisma/auto-tunnel.db
     return path.join(process.cwd(), 'prisma', path.basename(p));
   } catch {
     return null;

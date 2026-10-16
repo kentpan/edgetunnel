@@ -111,6 +111,18 @@ if (upstreamWorker && sha256(upstreamWorker) !== sha256(localWorker)) {
   console.log('✓ _worker.js 与上游一致, 无需同步');
 }
 
+// ── 1b. worker-core.mjs 一致性强制对齐(独立于上游差异判定) ────────────
+// 运行时核心 = src/lib/core/worker-core.mjs(invoke-core 静态 import), 必须与
+// worker/_worker.js 字节一致。仓库历史中可能存在"手动更新 _worker.js 而未
+// 刷新副本"的提交 —— 若仅凭 workerChanged 刷新副本, 脱节将永远无法自愈,
+// 部署产物中的核心将停留在旧版本(线上实际运行版本与代码版本不符即此症)。
+const alignedWorker = readFileSync(WORKER_PATH);
+if (sha256(readFileSync(CORE_PATH)) !== sha256(alignedWorker)) {
+  writeFileSync(CORE_PATH, alignedWorker);
+  result.workerChanged = true;
+  console.log('✓ worker-core.mjs 与 _worker.js 不一致, 已强制对齐(计入变更)');
+}
+
 // ── 2. 前端页面检测与同步(源站以核心 Pages静态页面 常量为准) ─────────────
 // 用"更新后的本地核心"解析 —— 上游改了页面站地址也能跟随。
 const effectiveWorker = readFileSync(WORKER_PATH).toString('utf8');
@@ -157,5 +169,9 @@ if (result.workerChanged || result.pagesChanged.length > 0) {
 // ── 4. 结果输出(stdout JSON + sync-result.json; 退出码恒 0) ────────────
 console.log('\n===== sync-upstream 结果摘要 =====');
 console.log(JSON.stringify(result, null, 2));
-writeFileSync(RESULT_PATH, JSON.stringify(result, null, 2) + '\n');
+// sync-result.json 仅在存在实质变更时落盘: 其 at 时间戳每次必然不同,
+// 无条件写盘会让工作流 git status 判定恒"有更新" → 每次空跑也触发完整部署
+if (result.workerChanged || result.pagesChanged.length > 0) {
+  writeFileSync(RESULT_PATH, JSON.stringify(result, null, 2) + '\n');
+}
 process.exit(0);
