@@ -4,6 +4,7 @@
 import { NextResponse } from 'next/server';
 import { resolveKV, currentKVDriver } from '@/lib/adapter/storage';
 import { buildCoreEnv, isCoreServicePath } from '@/lib/adapter/invoke-core';
+import packageJson from '../../../../package.json';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,7 +19,7 @@ export async function GET() {
   })();
   return NextResponse.json({
     name: 'autotunnel',
-    version: '1.0.5',
+    version: packageJson.version,
     runtime,
     storage: { driver: currentKVDriver() || kv.driverName, resolved: storageDriver },
     adminConfigured: Boolean(

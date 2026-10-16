@@ -93,7 +93,7 @@ PORT=3000 npm run serve:node   # 单端口: Next.js + WS 代理 + node:sqlite
    | `CLOUDFLARE_ACCOUNT_ID` | 可选(缺省自动探测; 探测需 Token 含 Account Settings:Read) |
 
 3. 推送到 `main` 分支(或手动触发 workflow) → 自动完成:
-   创建/复用 D1 + KV → 推送 `server/schema.sql` / `server/seed.sql` → OpenNext 构建 →
+   创建/复用 D1 + KV → 推送 `prisma/d1-schema.sql` / `prisma/seed.sql` → OpenNext 构建 →
    混编适配层组装(`scripts/build-pages-adapter.mjs`) → `wrangler pages deploy dist-pages`
 
 > 💡 可选变量: `DEPLOYTYPE=workers` 切换 Workers 部署; `deploy.config.js` 调整项目名/D1/KV。

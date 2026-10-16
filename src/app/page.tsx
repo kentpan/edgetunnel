@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import packageJson from '../../package.json';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -45,8 +46,8 @@ export default function Home() {
       <main className="flex-1 w-full max-w-5xl mx-auto px-4 sm:px-6 py-10 sm:py-16">
         {/* Hero */}
         <section className="text-center space-y-5">
-          <Badge variant="outline" className="gap-1.5 px-3 py-1 text-sm">
-            <Zap className="h-3.5 w-3.5" /> Autotunnel v1.0.5
+          <Badge variant="outline" className="gap-1.5 px-3 py-1 text-base">
+            <Zap className="h-3.5 w-3.5" /> Autotunnel v{packageJson.version}
           </Badge>
           <h1 className="text-3xl sm:text-5xl font-bold tracking-tight">
             Autotunnel
@@ -54,8 +55,8 @@ export default function Home() {
               边缘隧道 · Next.js 重构版
             </span>
           </h1>
-          <p className="text-muted-foreground max-w-2xl mx-auto text-sm sm:text-base leading-relaxed">
-            前端页面自 <code className="text-xs bg-muted px-1.5 py-0.5 rounded">edt-pages.github.io</code>{' '}
+          <p className="text-muted-foreground max-w-2xl mx-auto text-base leading-relaxed">
+            前端页面自 <code className="text-base bg-muted px-1.5 py-0.5 rounded">edt-pages.github.io</code>{' '}
             提取并字节级原样复刻；worker 服务端核心保持原版不变。
             默认 Cloudflare Pages 部署，自动适配 Node.js + node:sqlite 与 Cloudflare Pages + KV/D1。
           </p>
@@ -86,7 +87,7 @@ export default function Home() {
                 {health ? RUNTIME_LABEL[health.runtime] ?? health.runtime : '检测中…'}
               </CardTitle>
             </CardHeader>
-            <CardContent className="text-xs text-muted-foreground">
+            <CardContent className="text-base text-muted-foreground">
               存储驱动：{health?.storage?.driver ?? '—'}
             </CardContent>
           </Card>
@@ -99,7 +100,7 @@ export default function Home() {
                 {health ? (health.adminConfigured ? '已配置（ADMIN_SECRET）' : '未配置') : '检测中…'}
               </CardTitle>
             </CardHeader>
-            <CardContent className="text-xs text-muted-foreground">
+            <CardContent className="text-base text-muted-foreground">
               密码来源 .env / 环境变量 ADMIN_SECRET
             </CardContent>
           </Card>
@@ -110,7 +111,7 @@ export default function Home() {
               </CardDescription>
               <CardTitle className="text-base">KV → D1 → node:sqlite → 内存</CardTitle>
             </CardHeader>
-            <CardContent className="text-xs text-muted-foreground">
+            <CardContent className="text-base text-muted-foreground">
               数据库路径唯一真源：.env DATABASE_URL
             </CardContent>
           </Card>
@@ -150,7 +151,7 @@ export default function Home() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <ul className="text-sm text-muted-foreground leading-relaxed space-y-1.5 list-disc pl-4">
+            <ul className="text-base text-muted-foreground leading-relaxed space-y-1.5 list-disc pl-4">
               <li>本项目仅供学习交流、技术研究与个人合法测试使用，请勿用于任何商业或非法用途；</li>
               <li>使用者必须遵守所在地法律法规（含《中华人民共和国网络安全法》及所在国家/地区相关规定），因使用不当产生的一切后果由使用者自行承担；</li>
               <li>本项目不提供任何节点服务、不做任何形式的技术支持与维护承诺，项目作者不对任何因使用或滥用本项目造成的直接/间接损失负责；</li>
@@ -165,14 +166,14 @@ export default function Home() {
             <CardTitle className="flex items-center gap-2 text-lg">
               <Star className="h-5 w-5 text-amber-500" /> 觉得好用？给个 Star 支持一下！
             </CardTitle>
-            <CardDescription className="text-sm leading-relaxed">
+            <CardDescription className="text-base leading-relaxed">
               如果 Autotunnel 对你有帮助，欢迎到仓库点个 Star —— 你的 Star
               是我们持续维护适配（Cloudflare / Node 双运行时、KV/D1 自动切换）的最大动力！
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Separator className="mb-4" />
-            <p className="text-sm text-muted-foreground leading-relaxed flex items-start gap-2">
+            <p className="text-base text-muted-foreground leading-relaxed flex items-start gap-2">
               <Heart className="h-4 w-4 mt-0.5 shrink-0 text-red-500" />
               <span>
                 特别感谢原项目{' '}
@@ -201,9 +202,9 @@ export default function Home() {
       </main>
 
       <footer className="mt-auto border-t py-6">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 text-center text-xs text-muted-foreground space-y-1">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 text-center text-base text-muted-foreground space-y-1">
           <p>
-            Autotunnel v1.0.5 · 基于 GPL-2.0 协议开源 · 前端复刻自 edt-pages.github.io ·
+            Autotunnel v{packageJson.version} · 基于 GPL-2.0 协议开源 · 前端复刻自 edt-pages.github.io ·
             核心服务版权归原项目所有 · 仅供学习研究，请务必遵守当地法律法规
           </p>
         </div>

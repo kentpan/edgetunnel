@@ -14,8 +14,8 @@
 //       的 DATABASE_URL(file:./avatar-nuxt.db → prisma/avatar-nuxt.db), 本地运行/
 //       CI 构建期均从 .env 统一读取。
 //   - d1Name: 可选, D1 云端数据库名称; 留空自动使用 projectName。启用 database
-//     后 CI 自动: ① 创建/复用 D1 ② 推送 schema 建表(server/schema.sql) ③ 推送
-//     seed(server/seed.sql, INSERT OR IGNORE 幂等) —— 失败即终止部署
+//     后 CI 自动: ① 创建/复用 D1 ② 推送 schema 建表(prisma/d1-schema.sql) ③ 推送
+//     seed(prisma/seed.sql, INSERT OR IGNORE 幂等) —— 失败即终止部署
 //     (发布成功 = 数据就绪)
 //   - kvName: 可选, 为空则跳过 KV 配置(不绑定 KV); 与 database 开关相互独立。
 //     worker 核心优先使用 KV 绑定(env.KV), 其次 D1(DB 绑定) —— 运行时自动适配
@@ -34,7 +34,7 @@ export default {
   deployType: 'pages',
 
   // 是否执行 D1 数据库操作(布尔开关):
-  //   true  = 启用 D1: 建库 + server/schema.sql 建表 + server/seed.sql 推送 + 绑定注入
+  //   true  = 启用 D1: 建库 + prisma/d1-schema.sql 建表 + prisma/seed.sql 推送 + 绑定注入
   //   false / 省略该字段 = 跳过全部 D1 数据库步骤, 仅部署站点代码
   // 本地 SQLite 数据库文件的路径/名称唯一真源 = .env 的 DATABASE_URL(不在这里配置)
   database: true,

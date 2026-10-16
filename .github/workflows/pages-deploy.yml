@@ -154,8 +154,18 @@ on:
   push:
     branches: [main]
   # sync-upstream.yml 同步到更新后直接调用本工作流发布(workflow_call 进程内
-  # 调用, 规避 GITHUB_TOKEN push 事件不触发其他工作流的限制)
-  workflow_call: {}
+  # 调用, 规避 GITHUB_TOKEN push 事件不触发其他工作流的限制)。
+  # 可复用调用(workflow_call)的 inputs 必须与 workflow_dispatch 保持同一集合 ——
+  # 调用方(sync-upstream.yml)以 with: project_name 传参, 此处必须显式声明,
+  # 否则 GitHub 校验报 "Invalid input, project_name is not defined in the
+  # referenced workflow" 拦死整个工作流。
+  workflow_call:
+    inputs:
+      project_name:
+        description: '项目名称(留空则读取 deploy.config.js)'
+        required: false
+        default: ''
+        type: string
   workflow_dispatch:
     inputs:
       project_name:

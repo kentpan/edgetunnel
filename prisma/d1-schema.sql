@@ -1,4 +1,4 @@
--- server/schema.sql — Autotunnel D1 结构(IF NOT EXISTS 幂等, 可重复执行)
+-- prisma/d1-schema.sql — Autotunnel D1 结构(IF NOT EXISTS 幂等, 可重复执行)
 -- worker 核心存储接口为 KV(get/put/delete); D1 模式下由运行时适配层
 -- (src/lib/adapter/storage.ts)将 KV 语义映射到 kv 表。
 CREATE TABLE IF NOT EXISTS kv (
