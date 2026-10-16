@@ -166,7 +166,7 @@ Cloudflare 线上: `ADMIN_SECRET`/`JWT_SECRET`/`CLOUDFLARE_API_TOKEN`/`CLOUDFLAR
 
 - 上游来源: `deploy.config.js` 的 `upstreamRepo`(默认 `cmliu/edgetunnel`), 仓库 Variable `UPSTREAM_REPO` 可覆盖
 - "一键更新发布"凭据: Pages 部署自动注入(缺省回落 Actions `GITHUB_TOKEN`);
-  Node 部署在 `.env` 配 `AUTOSYNC_TOKEN`(GitHub PAT, 需 **Actions: write**)+ `GITHUB_REPOSITORY(owner/repo)`
+  Node 部署在 `.env` 配 `AUTOSYNC_TOKEN`(GitHub PAT, 需 **Actions: write**)+ `GH_REPOSITORY(owner/repo)`
 
 ## 🗂 目录结构
 

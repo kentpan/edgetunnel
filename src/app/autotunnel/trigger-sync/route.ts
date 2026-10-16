@@ -11,8 +11,8 @@
  * 凭据(双运行时, 与部署方式对齐):
  *   Cloudflare Pages: 工作流注入 AUTOSYNC_TOKEN(缺省回落 Actions GITHUB_TOKEN,
  *     workflow_dispatch 属 GITHUB_TOKEN 例外事件, 可正常创建 run)+
- *     GITHUB_REPOSITORY(部署时自动写入);
- *   Node.js: .env 配置 AUTOSYNC_TOKEN(PAT, 需 Actions: write)+ GITHUB_REPOSITORY。
+ *     GH_REPOSITORY(部署时自动写入);
+ *   Node.js: .env 配置 AUTOSYNC_TOKEN(PAT, 需 Actions: write)+ GH_REPOSITORY。
  *
  * GET 返回当前触发链路配置状态(不回显 token), 供排障。
  */
@@ -44,7 +44,7 @@ function readSyncConfig(): SyncConfig {
   };
   return {
     token: pick('AUTOSYNC_TOKEN', 'GH_PAT', 'GITHUB_TOKEN'),
-    repository: pick('GITHUB_REPOSITORY', 'AUTOSYNC_REPO'),
+    repository: pick('GH_REPOSITORY', 'AUTOSYNC_REPO'),
     workflow: pick('AUTOSYNC_WORKFLOW') || DEFAULT_WORKFLOW,
     branch: pick('AUTOSYNC_BRANCH') || DEFAULT_BRANCH,
   };
@@ -116,7 +116,7 @@ export async function GET(req: NextRequest) {
       hints: {
         tokenMissing: !cfg.token,
         repositoryMissing: !cfg.repository,
-        fix: '配置 AUTOSYNC_TOKEN(GitHub PAT, Actions: write) 与 GITHUB_REPOSITORY(owner/repo) —— Pages 由部署工作流自动注入, Node 部署写入 .env',
+        fix: '配置 AUTOSYNC_TOKEN(GitHub PAT, Actions: write) 与 GH_REPOSITORY(owner/repo) —— Pages 由部署工作流自动注入, Node 部署写入 .env',
       },
     },
     { headers: { 'Cache-Control': 'no-store' } },
@@ -140,9 +140,9 @@ export async function POST(req: NextRequest) {
         ok: false,
         error: 'missing_credentials',
         message: !cfg.repository
-          ? '未配置 GITHUB_REPOSITORY(owner/repo) —— Pages 部署由工作流自动注入; Node 部署请在 .env 配置'
+          ? '未配置 GH_REPOSITORY(owner/repo) —— Pages 部署由工作流自动注入; Node 部署请在 .env 配置'
           : '未配置 AUTOSYNC_TOKEN —— Cloudflare Pages 部署由工作流注入(缺省回落 Actions GITHUB_TOKEN); Node 部署请在 .env 配置 GitHub PAT(需 Actions: write 权限)',
-        missing: [!cfg.repository && 'GITHUB_REPOSITORY', !cfg.token && 'AUTOSYNC_TOKEN'].filter(Boolean),
+        missing: [!cfg.repository && 'GH_REPOSITORY', !cfg.token && 'AUTOSYNC_TOKEN'].filter(Boolean),
       },
       { status: 400, headers: { 'Cache-Control': 'no-store' } },
     );
@@ -155,7 +155,7 @@ export async function POST(req: NextRequest) {
       result.status === 401 || result.status === 403
         ? 'AUTOSYNC_TOKEN 无效或权限不足(需要 Actions: write)'
         : result.status === 404
-          ? '仓库或工作流文件不存在(确认 GITHUB_REPOSITORY 与 .github/workflows/sync-upstream.yml)'
+          ? '仓库或工作流文件不存在(确认 GH_REPOSITORY 与 .github/workflows/sync-upstream.yml)'
           : result.status === 422
             ? `分支不存在: ${cfg.branch}`
             : result.detail;

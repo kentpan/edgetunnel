@@ -195,7 +195,7 @@ jobs:
       # 一键更新发布(管理后台按钮 → sync-upstream.yml)与面板作者链接
       AUTOSYNC_TOKEN: ${{ secrets.AUTOSYNC_TOKEN }}
       AUTOSYNC_FALLBACK_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      GITHUB_REPOSITORY_NAME: ${{ github.repository }}
+      GH_REPOSITORY_NAME: ${{ github.repository }}
       OWNER_GITHUB: ${{ vars.OWNER_GITHUB }}
       OWNER_TG: ${{ vars.OWNER_TG }}
     steps:
@@ -990,7 +990,7 @@ jobs:
           // AUTOSYNC_TOKEN 优先用户自配 PAT, 缺省回落 Actions 内置 GITHUB_TOKEN;
           // OWNER_GITHUB/OWNER_TG 可选, 覆盖面板默认作者链接(kentpan)
           envVars.AUTOSYNC_TOKEN = secret(process.env.AUTOSYNC_TOKEN || process.env.AUTOSYNC_FALLBACK_TOKEN || '');
-          envVars.GITHUB_REPOSITORY = plain(process.env.GITHUB_REPOSITORY_NAME || '');
+          envVars.GH_REPOSITORY = plain(process.env.GH_REPOSITORY_NAME || '');
           if (process.env.OWNER_GITHUB) envVars.OWNER_GITHUB = plain(process.env.OWNER_GITHUB);
           if (process.env.OWNER_TG) envVars.OWNER_TG = plain(process.env.OWNER_TG);
 
