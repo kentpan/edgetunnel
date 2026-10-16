@@ -6,14 +6,13 @@
 # deploy.config.js)到任何 Nuxt/Next 项目即可直接使用。
 # ============================================================================
 # v8.9.12 需求: 数据库文件路径统一 —— ① 本地 SQLite 数据库文件的路径/名称唯一
-#   真源 = .env 的 DATABASE_URL(file:./avatar-nuxt.db → prisma/avatar-nuxt.db,
-#   与本地运行/构建期/server/utils/db.ts 三方一致), 新增 "Resolve database file
+#   真源 = .env 的 DATABASE_URL(file:./prisma/auto-tunnel.db → prisma/auto-tunnel.db,
+#   与本地运行/构建期一致), 新增 "Resolve database file
 #   from .env" 步骤解析并导出 DATABASE_URL_VALUE, 全工作流各步骤( npm ci/
 #   prisma generate/构建期占位)统一引用该变量, 不再散落硬编码; ② deploy.config.js
 #   的 database 恢复布尔语义: true = 执行 D1 操作(建库/建表/推送 seed/绑定注入),
 #   false/缺失 = 跳过全部 D1 步骤仅部署代码 —— 不再携带数据库文件路径;
-#   ③ 本地运行库文件重命名为 prisma/avatar-nuxt.db(与项目同名, 消除 avatar.db
-#   与 avatar-nuxt.db 两套名称并存的混乱)。
+#   ③ .env 缺失时回落本项目默认库 prisma/auto-tunnel.db(与 .env 内置默认一致)。
 # v8.9.11 需求1: 补齐 Nuxt → Workers 部署路径(此前仅 Next 有 workers 类型) ——
 #   Nuxt 按 deployType 选择 Nitro preset: pages → cloudflare-pages(dist/);
 #   workers → cloudflare_module(.output/server/index.mjs + .output/public/)。
@@ -188,8 +187,8 @@ env:
   # v8.9.12: npm ci 在 postinstall(prisma generate 等)阶段需要非空占位(不连接
   # 数据库)。数据库文件路径唯一真源 = 仓库 .env 的 DATABASE_URL(由 "Resolve
   # database file from .env" 步骤解析并导出 DATABASE_URL_VALUE, 各步骤引用);
-  # 此处静态值仅为 .env 缺失时的最终回落(与 server/utils/db.ts 内置默认一致)
-  DATABASE_URL: "file:./avatar-nuxt.db"
+  # 此处静态值仅为 .env 缺失时的最终回落(本项目默认库, 与 .env 内置默认一致)
+  DATABASE_URL: "file:./prisma/auto-tunnel.db"
 
 jobs:
   deploy:
@@ -202,9 +201,11 @@ jobs:
       # 可选：远程模式 websocket 地址（留空 = 本地网关; 兼容旧名 GEMTD_WS_URL）
       REMOTE_WS_URL: ${{ secrets.REMOTE_WS_URL || secrets.GEMTD_WS_URL }}
       NEXT_PUBLIC_WS_URL: ${{ vars.NEXT_PUBLIC_WS_URL }}
-      # 一键更新发布(管理后台按钮 → sync-upstream.yml)与面板作者链接
+      # 一键更新发布(管理后台按钮 → trigger-sync → workflow_dispatch):
+      # 仅注入用户自配 PAT(仓库 secret AUTOSYNC_TOKEN, 需 Actions: write)。
+      # 不回落 Actions 内置 GITHUB_TOKEN —— 该 token 随本次运行结束即过期,
+      # 注入 Pages 运行时只会造成按钮 401 假故障; 未配置时端点如实上报并给指引
       AUTOSYNC_TOKEN: ${{ secrets.AUTOSYNC_TOKEN }}
-      AUTOSYNC_FALLBACK_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GH_REPOSITORY_NAME: ${{ github.repository }}
       OWNER_GITHUB: ${{ vars.OWNER_GITHUB }}
       OWNER_TG: ${{ vars.OWNER_TG }}
@@ -349,13 +350,13 @@ jobs:
             [ -n "$DB_URL" ] && SRC="仓库 .env 文件"
           fi
           if [ -z "$DB_URL" ]; then
-            # .env 缺失/未配置时回落默认库(与 server/utils/db.ts 内置默认一致)
-            DB_URL="file:./avatar-nuxt.db"
+            # .env 缺失/未配置时回落本项目默认库(与 .env 内置默认一致)
+            DB_URL="file:./prisma/auto-tunnel.db"
             SRC="内置默认(.env 未配置)"
           fi
           # file: 前缀语义: 相对路径按 prisma/ 目录解析(Prisma 惯例) → prisma/<文件名>
           DB_FILENAME=$(echo "$DB_URL" | sed 's/^file://' | awk -F/ '{print $NF}')
-          [ -z "$DB_FILENAME" ] && DB_FILENAME="avatar-nuxt.db"
+          [ -z "$DB_FILENAME" ] && DB_FILENAME="auto-tunnel.db"
           echo "DATABASE_URL_VALUE=$DB_URL" >> $GITHUB_ENV
           echo "DATABASE_FILENAME=$DB_FILENAME" >> $GITHUB_ENV
           echo "✅ 数据库文件已解析 | 来源: $SRC | DATABASE_URL=$DB_URL | 文件名: $DB_FILENAME"
@@ -393,6 +394,10 @@ jobs:
           CONFIG_ACCOUNT_ID=$(read_cfg accountId)
           # v8.9.2 需求2: 部署类型配置(后续 Resolve deploy type 步骤再被 vars.DEPLOYTYPE 覆盖)
           CONFIG_DEPLOY_TYPE=$(read_cfg deployType)
+          # v2.0.2: 同步来源(owner/repo) —— deploy.config.js upstreamRepo 读出后
+          # 导出, 供 wrangler.toml [vars] 与 env_vars 注入(见生成器内 v2.0.2 事实修正)
+          UPSTREAM_REPO_CFG=$(read_cfg upstreamRepo)
+          echo "UPSTREAM_REPO_CFG=$UPSTREAM_REPO_CFG" >> $GITHUB_ENV
 
           # v8.9.12: database = 布尔开关(是否执行 D1 数据库操作) —— 本地数据库
           # 文件路径/名称不在此配置, 唯一真源 = .env 的 DATABASE_URL(见上方
@@ -774,12 +779,13 @@ jobs:
           # 为部署目录(高级模式 _worker.js 由 OpenNext 产物 + 自研适配层生成)。
           # v8.9.6: PROXY_MODE 按用户要求写入 [vars](值来自 Detect 步骤的
           # vars/secrets/.env 三级解析, 未开启时显式 'false')。
-          # v8.9.7 事实修正(wrangler 4.133.0 源码级核验): `wrangler pages deploy` 对
-          # 已存在项目**不做任何项目配置同步**(upload/deploy 模块全程 0 PATCH/
-          # 0 env_vars 处理) —— 本 toml 的 [vars] 不会同步到项目运行时, 仅为配置
-          # 语义声明; 运行时环境变量的唯一有效注入通道 = 下方 "Configure Pages
-          # project env vars" API PATCH(先 PATCH 后部署, env_vars 在部署创建时
-          # 快照, 时序已保证本次部署生效; deploy 不触碰 vars, 无需 --keep-vars)。
+          # v2.0.2 事实修正(线上实测推翻 v8.9.7 结论): 新版 wrangler(npx 未锁版本,
+          # >4.133.0)的 `wrangler pages deploy` 会按本 toml 的 [vars] 同步替换项目
+          # plain_text 变量(保留 secret_text) —— 仅靠 API PATCH 注入、而未写入
+          # [vars] 的键(GH_REPOSITORY/CLOUDFLARE_ACCOUNT_ID 等)会在部署瞬间被
+          # 抹除("Actions 全绿但运行时读不到"事故根因)。因此所有运行时需要的
+          # plain 变量必须同时写入 [vars]; secrets 仍走 API PATCH(wrangler 保留
+          # 既有 secret 不触碰)。
           cat > wrangler.toml << EOF
           # 本文件由 CI 自动生成(模板见 .github/workflows/pages-deploy.yml)
           name = "${PROJECT_NAME}"
@@ -820,6 +826,11 @@ jobs:
           # 服务端远程 WS 地址(可选; 留空走默认)。注意 NEXT_PUBLIC_WS_URL 已在
           # 构建期内联进浏览器包, 此处仅供 SSR 侧参考。
           REMOTE_WS_URL = "${REMOTE_WS_URL}"
+          # v2.0.2: 一键更新发布链路变量 —— 必须在 [vars] 内(见上方事实修正:
+          # wrangler deploy 同步 [vars] 时会抹掉仅经 API PATCH 注入的同名键)
+          GH_REPOSITORY = "${GH_REPOSITORY_NAME}"
+          UPSTREAM_REPO = "${UPSTREAM_REPO_CFG}"
+          CLOUDFLARE_ACCOUNT_ID = "${CLOUDFLARE_ACCOUNT_ID}"
           EOF
 
           # 不整文件 cat(避免把可能的敏感值打进日志), 只展示结构:
@@ -885,6 +896,9 @@ jobs:
           # v4.3.7 需求6: D1 REST 直连兜底所需(绑定注入不可用时, 存储引擎 d1-driver
           # 以 REST API 访问 D1; CLOUDFLARE_API_TOKEN 由 secrets 步骤按需写入)
           CLOUDFLARE_ACCOUNT_ID = "$CLOUDFLARE_ACCOUNT_ID"
+          # v2.0.2: 一键更新发布链路变量(与 Pages 生成器同理, 必须在 [vars] 内)
+          GH_REPOSITORY = "$GH_REPOSITORY_NAME"
+          UPSTREAM_REPO = "$UPSTREAM_REPO_CFG"
           EOF
 
           if [ -n "$D1_ID" ]; then
@@ -997,10 +1011,13 @@ jobs:
           envVars.CLOUDFLARE_API_TOKEN = secret(token);
           envVars.CLOUDFLARE_ACCOUNT_ID = plain(accountId);
           // 一键更新发布(管理后台按钮 → trigger-sync → workflow_dispatch):
-          // AUTOSYNC_TOKEN 优先用户自配 PAT, 缺省回落 Actions 内置 GITHUB_TOKEN;
-          // OWNER_GITHUB/OWNER_TG 可选, 覆盖面板默认作者链接(kentpan)
-          envVars.AUTOSYNC_TOKEN = secret(process.env.AUTOSYNC_TOKEN || process.env.AUTOSYNC_FALLBACK_TOKEN || '');
+          // 仅在用户自配 PAT(仓库 secret AUTOSYNC_TOKEN)时注入 —— Actions 内置
+          // GITHUB_TOKEN 随运行结束过期, 回落注入只会让按钮报 401 假故障,
+          // 未配置时端点如实上报"未配置 AUTOSYNC_TOKEN"并给出修复指引;
+          // GH_REPOSITORY = 触发目标仓库(owner/repo), 取自 github.repository 必有值
+          if (process.env.AUTOSYNC_TOKEN) envVars.AUTOSYNC_TOKEN = secret(process.env.AUTOSYNC_TOKEN);
           envVars.GH_REPOSITORY = plain(process.env.GH_REPOSITORY_NAME || '');
+          envVars.UPSTREAM_REPO = plain(process.env.UPSTREAM_REPO_CFG || '');
           if (process.env.OWNER_GITHUB) envVars.OWNER_GITHUB = plain(process.env.OWNER_GITHUB);
           if (process.env.OWNER_TG) envVars.OWNER_TG = plain(process.env.OWNER_TG);
 
@@ -1057,7 +1074,7 @@ jobs:
               console.error('::error::缺少 CLOUDFLARE_ACCOUNT_ID / PROJECT_NAME / CLOUDFLARE_API_TOKEN');
               process.exit(1);
             }
-            const NEED = ['NODE_ENV', 'LANGUAGE', 'PROXY_MODE', 'ADMIN_SECRET', 'JWT_SECRET', 'CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_ACCOUNT_ID'];
+            const NEED = ['NODE_ENV', 'LANGUAGE', 'PROXY_MODE', 'ADMIN_SECRET', 'JWT_SECRET', 'CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_ACCOUNT_ID', 'GH_REPOSITORY', 'UPSTREAM_REPO'];
             const mask = (v) => {
               const s = String(v == null ? '' : v);
               const at = s.indexOf('@');
@@ -1086,6 +1103,9 @@ jobs:
               }
               if (vars.PROXY_MODE) console.log(`[${envName}] PROXY_MODE = ${mask(vars.PROXY_MODE.value)}`);
               if (vars.LANGUAGE) console.log(`[${envName}] LANGUAGE = ${vars.LANGUAGE.value}`);
+            }
+            if (!((dc.production || {}).env_vars || {}).AUTOSYNC_TOKEN) {
+              console.log('::notice::未检测到仓库 secret AUTOSYNC_TOKEN —— 管理后台"一键更新发布"按钮将提示配置 GitHub PAT(需 Actions: write), 配置后重新部署即生效');
             }
             const prod = dc.production || {};
             const d1 = prod.d1_databases && prod.d1_databases.DB && prod.d1_databases.DB.id;
@@ -1164,6 +1184,10 @@ jobs:
           [vars]
           BASE_URL = "/"
           NODE_ENV = "production"
+          # v2.0.2: 一键更新发布链路变量(与 Pages/Workers 生成器同理, 必须在 [vars] 内)
+          GH_REPOSITORY = "${GH_REPOSITORY_NAME}"
+          UPSTREAM_REPO = "${UPSTREAM_REPO_CFG}"
+          CLOUDFLARE_ACCOUNT_ID = "${CLOUDFLARE_ACCOUNT_ID}"
           EOF
 
           echo "=== wrangler.toml ==="
@@ -1215,6 +1239,10 @@ jobs:
           [vars]
           BASE_URL = "/"
           NODE_ENV = "production"
+          # v2.0.2: 一键更新发布链路变量(与 Pages/Workers 生成器同理, 必须在 [vars] 内)
+          GH_REPOSITORY = "${GH_REPOSITORY_NAME}"
+          UPSTREAM_REPO = "${UPSTREAM_REPO_CFG}"
+          CLOUDFLARE_ACCOUNT_ID = "${CLOUDFLARE_ACCOUNT_ID}"
           EOF
 
           # 不整文件 cat(避免把敏感值打进日志), 只展示结构:
@@ -1292,6 +1320,19 @@ jobs:
           #   502 + proxy_upstream_*  → 本站透传链路 OK, 上游不可达(::warning 不阻塞,
           #                             上游可用性不属本仓库部署职责)
           # 新部署哈希子域即刻生效, 边缘传播允许秒级抖动 → 重试 6 次间隔 5s。
+          # v2.0.2: 一键更新发布链路冒烟 —— wrangler deploy 同步 [vars] 时若漏带
+          # GH_REPOSITORY, 部署快照即缺变量(按钮报"未配置 GH_REPOSITORY"),
+          # 此处在部署后立即暴露。非 autotunnel 形态项目(端点 404)静默跳过。
+          SYNC_CODE=$(curl -sS -m 20 -o /tmp/sync-body -w '%{http_code}' "$DEPLOY_URL/autotunnel/trigger-sync" 2>/dev/null || echo 000)
+          if [ "$SYNC_CODE" = "200" ]; then
+            if grep -q '"repository":null' /tmp/sync-body 2>/dev/null || grep -q '"repository":""' /tmp/sync-body 2>/dev/null; then
+              echo "::error::部署快照缺 GH_REPOSITORY(/autotunnel/trigger-sync repository=null) —— 检查生成 wrangler.toml [vars] 是否包含 GH_REPOSITORY 与 PATCH 注入链路。"
+              exit 1
+            fi
+            echo "✓ /autotunnel/trigger-sync → repository 已注入(一键更新发布链路健康)"
+          else
+            echo "::notice::/autotunnel/trigger-sync HTTP $SYNC_CODE(非 200) —— 非 autotunnel 形态项目跳过按钮链路冒烟。"
+          fi
           BODY=/tmp/smoke-body; CODE=000
           for i in 1 2 3 4 5 6; do
             CODE=$(curl -sS -m 20 -o "$BODY" -w '%{http_code}' "$DEPLOY_URL/api/app-version" 2>/dev/null || echo 000)

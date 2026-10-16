@@ -8,7 +8,7 @@
 //   - Cloudflare D1 模式: pages-deploy.yml 推送 server/schema.sql 建表
 //     (含 updated_at 审计列, INSERT OR IGNORE 幂等)。
 //   - prisma client 不参与运行时; DATABASE_URL 相对路径按 Prisma 约定
-//     相对本目录解析(file:./avatar-nuxt.db → prisma/avatar-nuxt.db)。
+//     相对本目录解析(file:./prisma/auto-tunnel.db → prisma/auto-tunnel.db)。
 
 generator client {
   provider = "prisma-client-js"

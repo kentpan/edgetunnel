@@ -11,7 +11,7 @@
 //   - database: 布尔开关, 门控是否执行 D1 数据库操作(建库/建表/推送 seed/绑定注入)。
 //       true  → 启用 D1 全链; false / 省略该字段 → 跳过全部 D1 步骤, 仅部署站点代码。
 //       注意: 本地 SQLite 数据库文件的路径/名称**不在这里配置**, 唯一真源 = .env
-//       的 DATABASE_URL(file:./avatar-nuxt.db → prisma/avatar-nuxt.db), 本地运行/
+//       的 DATABASE_URL(file:./prisma/auto-tunnel.db → prisma/auto-tunnel.db), 本地运行/
 //       CI 构建期均从 .env 统一读取。
 //   - d1Name: 可选, D1 云端数据库名称; 留空自动使用 projectName。启用 database
 //     后 CI 自动: ① 创建/复用 D1 ② 推送 schema 建表(prisma/d1-schema.sql) ③ 推送
@@ -80,7 +80,8 @@ export default {
 //   REMOTE_WS_URL         — 可选
 //   CLOUDFLARE_ACCOUNT_ID 账号 ID(缺省优先用 wrangler whoami 自动探测, 失败回落 REST; 需 Token 含 Account Settings:Read)
 //   AUTOSYNC_TOKEN        — 可选, 管理后台"一键更新发布"用的 GitHub PAT(需 Actions: write);
-//                           缺省回落 Actions 内置 GITHUB_TOKEN(公共仓库即可用)
+//                           仅在配置时注入(Actions 内置 GITHUB_TOKEN 随运行结束过期, 不回落);
+//                           未配置时按钮端点如实提示配置方法, 配置后重新部署即生效
 //   OWNER_GITHUB / OWNER_TG — 可选 Variable, 管理面板底部社交入口链接;
 //                           v1.0.5 起默认指向 kentpan/edgetunnel 与 t.me/kentpan,
 //                           配置后覆盖为自己的主页

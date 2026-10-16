@@ -23,43 +23,7 @@
 
 ## 📖 项目简介
 
-Autotunnel 是对 [kentpan/edgetunnel](https://github.com/kentpan/edgetunnel)（源自 [cmliu/edgetunnel](https://github.com/cmliu/edgetunnel)）的重构版本。
-
-原项目将全部逻辑(约 6600+ 行)集中在单个 `_worker.js` 中, 前端页面托管于外部静态站(`edt-pages.github.io`)。本项目将其重构为 **Next.js 16 App Router** 工程:
-
-| 组成 | 说明 |
-|---|---|
-| 🎨 **前端页面** | 自原项目使用的静态站**原样提取**, 以 base64 内嵌模块实现**字节级复刻**(login / admin / noADMIN / noKV / version), 经 Next.js 路由原路径返回 |
-| ⚙️ **worker 服务端核心** | **完全保持不变** —— `worker/_worker.js` 与原仓库字节一致(MD5 校验), VLESS/Trojan、WS/gRPC/XHTTP、订阅生成、管理 API、日志记录等全部为原版服务 |
-| 🔌 **自动适配层** | 运行时自动识别环境, 存储链: **KV 绑定 → D1 绑定(DB) → node:sqlite → 内存**; 平台垫片仅补齐 workerd 语义(MD5 / fetcher.connect / WebSocketPair / request.cf), 核心零改动 |
-| 🚀 **部署两件套** | `deploy.config.js` + `.github/workflows/pages-deploy.yml`, 默认 **pages** 方式发布, 支持 `deployType: pages \| workers` 与 `DEPLOYTYPE` 仓库变量覆盖 |
-| 📊 **CF 用量统计** | 面板顶部"Workers/Pages 请求使用情况"模块**开箱即显示** —— 部署凭据 `CLOUDFLARE_API_TOKEN`(GitHub Actions Secrets 自动注入 / Node `.env`)被服务端自动写入 cf.json(未配置时), 由核心原版 `getCloudflareUsage` 携凭据直查 Cloudflare GraphQL, UI 与数据获取与 cmliu/edgetunnel 完全一致; 也可在后台改配 UsageAPI/Account ID+Token/Email+Key 自定义方案。⚠️ **Token 必须含 `Account Analytics:Read` 权限**(GraphQL 用量查询硬性前置, 与 cmliu/edgetunnel 弹窗提示一致; 编辑 Token 追加即可, 无需换值) —— 缺失时模块按原版语义静默隐藏(部署 Actions 日志中 `wrangler whoami` 会打印 Token 权限表可直接核对) |
-
-## ✨ 特性
-
-- **前端原样复刻**: 页面字节级一致, 管理面板全部功能(节点链接/优选IP/TG通知/CF用量/代理检测/测速等)原样可用
-- **核心零改动**: `worker/_worker.js` 逐字节保留, 可随时独立部署回 Cloudflare 高级模式
-- **双模式运行**:
-  - ☁️ **Cloudflare Pages(默认)**: OpenNext 编译前端 + 原版核心混编 `dist-pages/_worker.js`, KV/D1 绑定自动注入
-  - 🟢 **Node.js 独立服务**: `server/node-server.mjs` 单端口承载 Next.js + WebSocket 升级, 数据落 `node:sqlite`
-- **配置唯一真源**: 本地/Node 模式全部配置收敛于 `.env`(含 `ADMIN_SECRET`/`DATABASE_URL`), CI 经 GitHub Secrets 自动注入线上
-- **管理密码改名**: 原项目 `ADMIN` 变量统一为 `ADMIN_SECRET`(向下兼容旧名)
-- **v1.0.1**:
-  - 📊 Cloudflare Workers/Pages 可用请求数统计默认走部署凭据: workflow 自动把部署 Token 注入 Pages env_vars, Node 模式从 `.env`/环境变量读取; 内置 `/autotunnel/cf-usage` 诊断端点(Cloudflare GraphQL 同款查询, 60s 缓存)
-  - ▼ 管理后台全部下拉框新增三角箭头与展开切换动画(双层 SVG 交叉滑动, 明暗主题自适应)
-- **v1.0.3 请求统计开箱即用(源头修复)**:
-  - 📊 cf.json 未配置且服务端持有 `CLOUDFLARE_API_TOKEN` 时自动写入部署默认凭据(经 env.KV 同一接口, KV/D1/node:sqlite 后端行为一致), 核心原版 `getCloudflareUsage` 携凭据直查 Cloudflare GraphQL —— 面板顶部"Workers/Pages 请求使用情况"模块无需任何手动配置即显示; 统计弹窗恢复上游原版三方案(UsageAPI / Account ID + API Token / Email + Global API Key, 默认选中 accountid), 与 cmliu/edgetunnel 的 UI 与数据获取完全一致; 管理员显式配置优先, 清空后最多 60s 自动恢复部署默认凭据
-  - 移除 v1.0.1 的"🚀 部署默认凭据"弹窗方案与 /admin/getCloudflareUsage 空凭据请求改写垫片 —— 部署凭据改由服务端数据层(cf.json)自动初始化, 从源头解决
-- **v1.0.5 品牌默认 + 部署凭据探测改用 wrangler**:
-  - 🎯 根因归档(线上实证): 仅含 Pages/D1/KV Edit 权限的部署 Token, Cloudflare GraphQL 用量查询返回 `authorization denied`, 面板按原版语义静默隐藏 —— `Account Analytics:Read` 是统计数据的硬性前置(与 cmliu/edgetunnel 弹窗提示一致; 注意必须是 **Account 级**, 不是 Zone 级)
-  - 🛡️ 账号 ID 探测与 Token 权限核对改用 `npx wrangler whoami`(优先), 输出含账号表与 Token 权限表并全部打印进部署日志 —— 部署 Token 实际具备哪些权限一眼可核(wrangler 失败时回落原 REST 探测)
-  - 🔗 面板底部社交入口默认指向 `kentpan/edgetunnel` 与 `t.me/kentpan`(OWNER_GITHUB/OWNER_TG 可覆盖)
-  - ✅ 线上版本自查: 浏览器访问 `/api/health` —— `version` 字段即线上实际部署的版本(如线上报旧值 = 新代码从未上线; `/version` 是上游 UI 版本戳, 不随本项目版本变化)
-- **v1.0.2 新增 —— 零维护自动跟随上游**:
-  - 🔄 **上游同步工作流**(`.github/workflows/sync-upstream.yml`): 每 6 小时定时检测上游 `_worker.js` 与前端五页面(login/admin/noADMIN/noKV/version), 任一有更新(含原项目**前端样式/功能**更新)自动同步进本项目 → commit → 直接调用部署工作流发布, 全程无人值守
-  - 🚀 **管理后台"一键更新发布"**: 版本弹窗一键触发同步+发布(workflow_dispatch), 免去手动跑 Actions; Pages 部署自动注入触发凭据, Node 部署在 `.env` 配 PAT 即可
-  - 🔗 **面板作者链接可配置**: `.env`/仓库 Variable 配置 `OWNER_GITHUB` / `OWNER_TG`, 管理面板底部 GitHub/Telegram 入口展示为部署者自己的主页(v1.0.5 起默认指向 `kentpan/edgetunnel` 与 `t.me/kentpan`, 留空即默认)
-  - 📚 **喋饭级使用教程**: [docs/使用教程.md](docs/使用教程.md) —— 项目作用/适用人群/三种部署/全功能说明/FAQ
+Autotunnel 是对 [cmliu/edgetunnel](https://github.com/cmliu/edgetunnel) 项目Fork后的重构版本。
 
 ## 🚀 快速开始
 
@@ -103,7 +67,7 @@ PORT=3000 npm run serve:node   # 单端口: Next.js + WS 代理 + node:sqlite
 ```ini
 ADMIN_SECRET=你的管理密码        # 必填: 管理后台密码(原 ADMIN)
 JWT_SECRET=随机密钥              # 必填: 签名密钥
-DATABASE_URL="file:./avatar-nuxt.db"  # 存储文件唯一真源(Node 模式)
+DATABASE_URI="file:./prisma/autotunnel.db"  # 存储文件唯一真源(Node 模式)
 
 # ---- 以下为核心可选变量(部署时自动注入, 全部可留空) ----
 # KEY=      快速订阅路径 + 加密秘钥
@@ -116,7 +80,7 @@ DATABASE_URL="file:./avatar-nuxt.db"  # 存储文件唯一真源(Node 模式)
 # WS_PATH=  传输路径(映射核心 PATH 变量, 避免与系统 PATH 冲突)
 ```
 
-Cloudflare 线上: `ADMIN_SECRET`/`JWT_SECRET`/`CLOUDFLARE_API_TOKEN`/`CLOUDFLARE_ACCOUNT_ID`
+Cloudflare 线上: `ADMIN_SECRET`/`JWT_SECRET`/`CLOUDFLARE_API_TOKEN`/`CLOUDFLARE_ACCOUNT_ID`/`GH_REPOSITORY`
 由工作流自动注入; 其余可选变量在 **Pages 项目 → Settings → Environment variables**
 添加同名键即可(运行时自动合并)。
 
@@ -210,7 +174,7 @@ autotunnel/
 
 ## 🙏 致谢与声明
 
-- 本项目基于 **[cmliu/edgetunnel](https://github.com/cmliu/edgetunnel)** 的优秀成果重构, 并感谢 **[kentpan/edgetunnel](https://github.com/kentpan/edgetunnel)** 的 fork 维护 —— 服务端核心版权归原项目所有, 本项目遵循相同协议(GPL-2.0)开源。
+- 本项目基于 **[cmliu/edgetunnel](https://github.com/cmliu/edgetunnel)** 的优秀成果重构 —— 服务端核心版权归原项目所有, 本项目遵循相同协议(GPL-2.0)开源。
 - 前端页面提取自原项目使用的 `edt-pages.github.io` 静态站, 仅作工程化整合与少量 UX 增强(下拉框箭头/动画), 页面内容版权同样归原项目。
 
 ## ⭐ 求个 Star!
