@@ -1937,7 +1937,9 @@
 		}
 
 		@keyframes version-update-dot-pulse {
-			0%, 100% {
+
+			0%,
+			100% {
 				transform: scale(1);
 				box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.3), 0 0 8px rgba(245, 158, 11, 0.75);
 			}
@@ -2087,6 +2089,7 @@
 		}
 
 		@keyframes egg-tremble {
+
 			0%,
 			100% {
 				transform: translate(0, 0);
@@ -2120,6 +2123,7 @@
 		}
 
 		@media (prefers-reduced-motion: reduce) {
+
 			.btn-version-copy.easter-egg-shaking,
 			.btn-version-copy.egg-release {
 				animation: none;
@@ -4786,6 +4790,7 @@
 			background: linear-gradient(180deg, #f8fffc 0%, #ecfdf5 100%);
 			color: #064e3b;
 			box-shadow: 0 12px 30px rgba(16, 185, 129, 0.12);
+			text-align: left;
 		}
 
 		.chain-verify-head {
@@ -4818,7 +4823,7 @@
 
 		.chain-verify-badge {
 			flex-shrink: 1;
-			max-width: 60%;
+			max-width: 100%;
 			min-width: 0;
 			overflow: hidden;
 			padding: 4px 8px;
@@ -4922,6 +4927,324 @@
 			pointer-events: none;
 		}
 
+		/* ===== 链式代理：来源切换与公开代理库 ===== */
+		.chain-proxy-modal {
+			--chain-accent: #8b5cf6;
+			--chain-accent-strong: #6d28d9;
+			--chain-accent-line: rgba(139, 92, 246, 0.35);
+			--chain-surface: #f8fafc;
+			--chain-surface-raised: #ffffff;
+			--chain-chip-bg: #f4f6f9;
+			--chain-chip-line: #e2e6ee;
+			--chain-line: #e5e7eb;
+			--chain-ink: #111827;
+			--chain-ink-soft: #4b5563;
+			--chain-ink-muted: #6b7280;
+		}
+
+		html.dark-mode .chain-proxy-modal {
+			--chain-surface: #1f1f23;
+			--chain-surface-raised: #2a2a30;
+			--chain-chip-bg: #26262c;
+			--chain-chip-line: #3a3a42;
+			--chain-line: #34343a;
+			--chain-ink: #f4f4f5;
+			--chain-ink-soft: #d4d4d8;
+			--chain-ink-muted: #a1a1aa;
+		}
+
+		.chain-source-header {
+			margin-bottom: 14px;
+		}
+
+		.chain-source-label {
+			margin-bottom: 7px;
+			color: var(--chain-ink-muted);
+			font-size: 11px;
+			font-weight: 700;
+			letter-spacing: 0.06em;
+			text-align: left;
+			text-transform: uppercase;
+		}
+
+		.chain-source-switch {
+			display: grid;
+			grid-template-columns: 1fr 1fr;
+			gap: 6px;
+			padding: 4px;
+			border: 1px solid var(--chain-line);
+			border-radius: 12px;
+			background: var(--chain-surface);
+		}
+
+		.chain-source-option {
+			display: flex;
+			flex-direction: column;
+			gap: 3px;
+			min-width: 0;
+			min-height: 52px;
+			padding: 9px 12px;
+			border: 1px solid transparent;
+			border-radius: 9px;
+			background: transparent;
+			color: var(--chain-ink-soft);
+			text-align: left;
+			cursor: pointer;
+			transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+		}
+
+		.chain-source-option:hover {
+			background: var(--chain-surface-raised);
+		}
+
+		.chain-source-option.is-active {
+			border-color: var(--chain-accent-line);
+			background: var(--chain-surface-raised);
+			color: var(--chain-ink);
+			box-shadow: 0 2px 10px rgba(17, 24, 39, 0.07);
+		}
+
+		.chain-source-option-title {
+			display: flex;
+			align-items: center;
+			gap: 6px;
+			font-size: 13px;
+			font-weight: 700;
+			white-space: nowrap;
+		}
+
+		.chain-source-option-desc {
+			overflow: hidden;
+			color: var(--chain-ink-muted);
+			font-size: 11px;
+			line-height: 1.35;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+		}
+
+		.chain-lib-panel[hidden],
+		.chain-manual-panel[hidden] {
+			display: none !important;
+		}
+
+		.chain-lib-refresh {
+			display: inline-flex;
+			flex: 0 0 auto;
+			align-items: center;
+			justify-content: center;
+			margin-left: auto;
+			min-height: 32px;
+			padding: 4px 12px;
+			border: 1px solid var(--chain-chip-line);
+			border-radius: 999px;
+			background: var(--chain-surface-raised);
+			color: var(--chain-ink-soft);
+			font-size: 11.5px;
+			font-weight: 700;
+			line-height: 1;
+			cursor: pointer;
+			white-space: nowrap;
+		}
+
+		.chain-lib-refresh:hover {
+			border-color: var(--chain-accent-line);
+			background: var(--chain-surface-raised);
+			color: var(--chain-accent-strong);
+		}
+
+		/* 表单小标题统一左对齐：弹窗整体是居中排版，标签居中在窄屏会显得松散 */
+		.chain-proxy-modal label {
+			text-align: left;
+		}
+
+		.chain-lib-filter-row {
+			display: flex;
+			align-items: flex-start;
+			gap: 10px;
+			margin-bottom: 12px;
+		}
+
+		.chain-lib-protocols {
+			display: flex;
+			flex: 1 1 auto;
+			flex-wrap: wrap;
+			gap: 6px;
+			min-width: 0;
+			margin-bottom: 0;
+		}
+
+		.chain-lib-protocol {
+			min-height: 32px;
+			padding: 5px 14px;
+			border: 1px solid var(--chain-chip-line);
+			border-radius: 999px;
+			background: var(--chain-chip-bg);
+			color: var(--chain-ink-muted);
+			font-family: 'Fira Code', 'Monaco', monospace;
+			font-size: 12px;
+			font-weight: 700;
+			letter-spacing: 0.01em;
+			line-height: 1;
+			cursor: pointer;
+			transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+		}
+
+		.chain-lib-protocol:hover {
+			border-color: var(--chain-accent-line);
+			background: var(--chain-surface-raised);
+			color: var(--chain-accent-strong);
+		}
+
+		.chain-lib-protocol.is-active {
+			border-color: transparent;
+			background: linear-gradient(135deg, #8b5cf6 0, #6d28d9 100%);
+			color: #fff;
+			box-shadow: 0 4px 12px rgba(139, 92, 246, 0.32);
+		}
+
+		.chain-lib-protocol[disabled] {
+			opacity: 0.42;
+			cursor: not-allowed;
+		}
+
+		.chain-lib-meta {
+			min-height: 0;
+			margin-top: -2px;
+			color: var(--chain-ink-muted);
+			font-size: 11.5px;
+			line-height: 1.45;
+			text-align: left;
+		}
+
+		.chain-lib-meta:empty {
+			display: none;
+		}
+
+		.chain-lib-field {
+			margin-bottom: 10px;
+		}
+
+		.chain-lib-field select {
+			width: 100%;
+			min-width: 0;
+			padding: 8px 12px;
+			border: 2px solid var(--chain-line);
+			border-radius: 8px;
+			background: var(--chain-surface-raised);
+			color: var(--chain-ink);
+			font-size: 13px;
+		}
+
+		#chainLibProxySelect {
+			font-family: 'Fira Code', 'Monaco', monospace;
+			font-size: 12px;
+		}
+
+		.chain-lib-map-card {
+			position: relative;
+			height: 132px;
+			margin-top: 12px;
+			border: 1px solid var(--chain-line);
+			border-radius: 10px;
+			background: var(--chain-surface);
+			overflow: hidden;
+		}
+
+		.chain-lib-map-card[hidden] {
+			display: none !important;
+		}
+
+		.chain-lib-map-badge {
+			position: absolute;
+			top: 9px;
+			left: 9px;
+			z-index: 400;
+			max-width: calc(100% - 18px);
+			overflow: hidden;
+			padding: 4px 9px;
+			border-radius: 999px;
+			background: rgba(17, 24, 39, 0.72);
+			color: #fff;
+			font-size: 11px;
+			font-weight: 600;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+			pointer-events: none;
+		}
+
+		.chain-lib-empty {
+			display: none;
+			margin-top: 12px;
+			padding: 11px 12px;
+			border: 1px dashed #fdba74;
+			border-radius: 9px;
+			background: #fff7ed;
+			color: #c2410c;
+			font-size: 12.5px;
+			line-height: 1.5;
+			text-align: left;
+		}
+
+		.chain-lib-empty.is-visible {
+			display: block;
+		}
+
+		html.dark-mode .chain-lib-empty {
+			border-color: rgba(251, 146, 60, 0.45);
+			background: rgba(194, 65, 12, 0.14);
+			color: #fdba74;
+		}
+
+		.chain-verify-meta {
+			display: flex;
+			flex: 0 1 auto;
+			flex-shrink: 1;
+			align-items: center;
+			gap: 6px;
+			min-width: 0;
+			max-width: 62%;
+		}
+
+		.chain-verify-source {
+			flex-shrink: 0;
+			padding: 3px 8px;
+			border-radius: 999px;
+			background: linear-gradient(135deg, #8b5cf6 0, #6d28d9 100%);
+			color: #fff;
+			font-size: 10.5px;
+			font-weight: 700;
+			letter-spacing: 0.02em;
+		}
+
+		/* 桌面端内容较长时固定操作区，避免「添加」按钮被滚动隐藏 */
+		@media (min-width: 769px) {
+			.chain-proxy-modal .chain-proxy-buttons {
+				position: sticky;
+				bottom: 0;
+				z-index: 3;
+				margin-top: 16px;
+				padding: 12px 0 4px;
+				border-top: 1px solid var(--chain-line);
+				background: #fff;
+			}
+
+			html.dark-mode .chain-proxy-modal .chain-proxy-buttons {
+				background: var(--bg-secondary, #1a1a1a);
+			}
+		}
+
+		html.dark-mode .chain-proxy-modal .chain-proxy-buttons {
+			background: var(--bg-secondary, #1a1a1a);
+		}
+
+		.chain-source-option:focus-visible,
+		.chain-lib-protocol:focus-visible,
+		.chain-lib-refresh:focus-visible,
+		.chain-lib-field select:focus-visible {
+			outline: 2px solid var(--chain-accent);
+			outline-offset: 2px;
+		}
+
 		/* 移动端适配 */
 		@media (max-width: 768px) {
 			.api-form-row-dual {
@@ -4948,6 +5271,18 @@
 			.chain-route-arrow {
 				justify-content: center;
 				transform: rotate(90deg);
+			}
+
+			.chain-source-switch {
+				grid-template-columns: 1fr;
+			}
+
+			.chain-source-option {
+				min-height: 46px;
+			}
+
+			.chain-lib-map-card {
+				height: 140px;
 			}
 
 		}
@@ -6877,6 +7212,7 @@
 				opacity: 0;
 				transform: translateY(6px);
 			}
+
 			to {
 				opacity: 1;
 				transform: translateY(0);
@@ -9534,6 +9870,7 @@
 
 		/* 集中的小屏幕适配：保持桌面布局不变，仅降低平板和手机端的信息密度 */
 		@media (max-width: 768px) {
+
 			html,
 			body {
 				max-width: 100%;
@@ -10234,6 +10571,7 @@
 		}
 
 		@media (min-width: 481px) and (max-width: 768px) {
+
 			.network-cards-container,
 			.latency-cards {
 				grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -10649,7 +10987,8 @@
 								<input type="text" id="grpcUserAgent"
 									title="用于客户端发起 gRPC 请求时的 User-Agent。&#10;Clash/Mihomo 内核使用默认 UA 时，可能被 Cloudflare 误判为 DDoS 异常流量并拦截。&#10;若客户端为 Clash/Mihomo，请务必设置此项。"
 									onchange="markModified('config')">
-								<button type="button" class="grpc-ua-action" onclick="fillCurrentGrpcUA()">获取当前UA</button>
+								<button type="button" class="grpc-ua-action"
+									onclick="fillCurrentGrpcUA()">获取当前UA</button>
 							</div>
 						</div>
 
@@ -10999,17 +11338,17 @@
 							title="从 ProxyIP 列表中选择可用的代理">
 							🗺️ 获取更多 PROXYIP
 						</button>
-						<button type="button" class="btn btn-search-proxy" id="exploreSocks5Btn"
+						<button type="button" class="btn btn-search-proxy" id="exploreSocks5Btn" hidden
 							onclick="showExploreSocks5Modal()" style="display: none; padding: 10px 16px;"
 							title="从SOCKS5列表中选择可用的代理">
 							🔒 获取更多 SOCKS5
 						</button>
-						<button type="button" class="btn btn-search-proxy" id="exploreHTTPBtn"
+						<button type="button" class="btn btn-search-proxy" id="exploreHTTPBtn" hidden
 							onclick="showExploreHTTPModal()" style="display: none; padding: 10px 16px;"
 							title="从HTTP列表中选择可用的代理">
 							🌐 获取更多 HTTP
 						</button>
-						<button type="button" class="btn btn-search-proxy" id="exploreHTTPSBtn"
+						<button type="button" class="btn btn-search-proxy" id="exploreHTTPSBtn" hidden
 							onclick="showExploreHTTPSModal()" style="display: none; padding: 10px 16px;"
 							title="从HTTPS列表中选择可用的代理">
 							🌐 获取更多 HTTPS
@@ -11121,7 +11460,8 @@
 						<div class="form-group" id="expandGroup" style="display: none;">
 							<div class="input-wrapper">
 								<div class="checkbox-group">
-									<input type="checkbox" id="expand" title="展开规则全文，输出完整分流规则列表" onchange="markModified('convert')">
+									<input type="checkbox" id="expand" title="展开规则全文，输出完整分流规则列表"
+										onchange="markModified('convert')">
 									<label for="expand" class="checkbox-label" title="展开规则全文，输出完整分流规则列表">展开规则全文</label>
 								</div>
 							</div>
@@ -11286,7 +11626,8 @@
 						class="version-state-tip is-outdated">需要更新</span></p>
 			</div>
 			<div class="version-info-actions">
-				<button type="button" id="versionCopyBtn" class="btn btn-version-copy" onclick="copyLatestWorkerSourceToClipboard()">📋
+				<button type="button" id="versionCopyBtn" class="btn btn-version-copy"
+					onclick="copyLatestWorkerSourceToClipboard()">📋
 					复制最新Worker.js源码 到剪贴板</button>
 				<button type="button" class="btn btn-version-download" onclick="openLatestPagesZipDownload()">📦
 					下载最新Pages.zip源码 上传部署</button>
@@ -11351,7 +11692,9 @@
 			<div class="alpn-content" style="text-align: left;">
 				<p class="alpn-text">您当前选择的 ALPN 选项为「<span id="alpnPendingLabel"></span>」。ALPN
 					用于显式指定节点所使用的应用层协议优先级，属于<strong>高级配置项</strong>。</p>
-				<p class="alpn-text">设置不当可能导致节点与您的客户端或网络环境不兼容，<strong>最坏情况下节点将无法建立连接</strong>。如果您不确定该选项的含义与影响，建议保持默认的「客户端自动协商」，由客户端自行完成协议协商。</p>
+				<p class="alpn-text">
+					设置不当可能导致节点与您的客户端或网络环境不兼容，<strong>最坏情况下节点将无法建立连接</strong>。如果您不确定该选项的含义与影响，建议保持默认的「客户端自动协商」，由客户端自行完成协议协商。
+				</p>
 			</div>
 			<div class="alpn-buttons">
 				<button type="button" class="btn btn-confirm-alpn btn-confirm-reset"
@@ -11371,12 +11714,16 @@
 			</div>
 			<div class="ech-content" style="text-align: left;">
 				<p class="ech-text">您已开启 ECH，但当前选择的浏览器指纹「<span id="echConflictFingerprint"></span>」不支持 ECH。</p>
-				<p class="ech-text">ECH（Encrypted ClientHello）仅在 <strong>chrome / firefox</strong> 指纹下生效。请选择处理方式：切换到支持的浏览器指纹以保留 ECH，或关闭 ECH。</p>
+				<p class="ech-text">ECH（Encrypted ClientHello）仅在 <strong>chrome / firefox</strong>
+					指纹下生效。请选择处理方式：切换到支持的浏览器指纹以保留 ECH，或关闭 ECH。</p>
 			</div>
 			<div class="ech-buttons">
-				<button type="button" class="btn btn-ech-option btn-ech-chrome" onclick="resolveECHConflict('chrome')">使用 chrome 指纹并开启 ECH</button>
-				<button type="button" class="btn btn-ech-option btn-ech-firefox" onclick="resolveECHConflict('firefox')">使用 firefox 指纹并开启 ECH</button>
-				<button type="button" class="btn btn-ech-option btn-ech-disable" onclick="resolveECHConflict('disable')">关闭 ECH</button>
+				<button type="button" class="btn btn-ech-option btn-ech-chrome"
+					onclick="resolveECHConflict('chrome')">使用 chrome 指纹并开启 ECH</button>
+				<button type="button" class="btn btn-ech-option btn-ech-firefox"
+					onclick="resolveECHConflict('firefox')">使用 firefox 指纹并开启 ECH</button>
+				<button type="button" class="btn btn-ech-option btn-ech-disable"
+					onclick="resolveECHConflict('disable')">关闭 ECH</button>
 			</div>
 		</div>
 	</div>
@@ -11573,9 +11920,11 @@
 					<span class="optimize-card-tag tag-pro">✅ 优点：无需安装，即开即用</span>
 					<span class="optimize-card-tag tag-con">⚠️ 缺点：易受运营商阻断，阻断时无法使用</span>
 				</button>
-				<button type="button" class="optimize-start-card optimize-card-domain" onclick="chooseOnlineDomainOptimize()">
+				<button type="button" class="optimize-start-card optimize-card-domain"
+					onclick="chooseOnlineDomainOptimize()">
 					<span class="optimize-card-icon">🛰️</span>
-					<span class="optimize-card-title">在线优选域名<span class="optimize-card-badge optimize-card-badge-orange">稳定</span></span>
+					<span class="optimize-card-title">在线优选域名<span
+							class="optimize-card-badge optimize-card-badge-orange">稳定</span></span>
 					<span class="optimize-card-desc">访问官方在线优选域名站点，直接使用现成的优选结果，无需自己操作</span>
 					<span class="optimize-card-tag tag-pro">✅ 优点：开箱即用，一劳永逸</span>
 					<span class="optimize-card-tag tag-con">⚠️ 缺点：更换网络运营商环境后需重新优选</span>
@@ -11598,10 +11947,14 @@
 			<h2 class="local-optimize-title">💻 本地优选工具</h2>
 			<p class="local-optimize-subtitle">选择一款工具，点击「前往 GitHub」即可在新窗口查看与下载</p>
 			<div class="local-ui-filter" id="localUiFilter">
-				<button type="button" class="local-ui-filter-btn is-active" data-ui="all" onclick="setLocalUiFilter('all')">全部</button>
-				<button type="button" class="local-ui-filter-btn" data-ui="webui" onclick="setLocalUiFilter('webui')">🌐 网页界面</button>
-				<button type="button" class="local-ui-filter-btn" data-ui="gui" onclick="setLocalUiFilter('gui')">🖥️ 图形界面</button>
-				<button type="button" class="local-ui-filter-btn" data-ui="cli" onclick="setLocalUiFilter('cli')">⌨️ 命令行CLI</button>
+				<button type="button" class="local-ui-filter-btn is-active" data-ui="all"
+					onclick="setLocalUiFilter('all')">全部</button>
+				<button type="button" class="local-ui-filter-btn" data-ui="webui" onclick="setLocalUiFilter('webui')">🌐
+					网页界面</button>
+				<button type="button" class="local-ui-filter-btn" data-ui="gui" onclick="setLocalUiFilter('gui')">🖥️
+					图形界面</button>
+				<button type="button" class="local-ui-filter-btn" data-ui="cli" onclick="setLocalUiFilter('cli')">⌨️
+					命令行CLI</button>
 			</div>
 			<div id="localOptimizeToolList" class="local-optimize-tools"><!-- 动态渲染 --></div>
 			<div class="local-optimize-footer">欢迎开源优选项目投稿</div>
@@ -14282,25 +14635,25 @@
 					const completed = entries.filter(({ info }) => info && info.status === "done");
 					const nonCn = completed.filter(({ info }) => !info.allowed);
 
-				if (nonCn.length) {
+					if (nonCn.length) {
+						return {
+							kind: "non-cn",
+							heading: "红牌警告",
+							title: "检测到当前网络出口不是 CN 直连",
+							message: "请确认浏览器当前网络是否经过了 代理、VPN 或 境外网络，\n在线优选仅有 CN 直连网络环境才可以实现！\n当前网络环境无法进行在线优选，可尝试使用「本地优选」。",
+							rows: nonCn,
+							details: completed
+						};
+					}
+
 					return {
-						kind: "non-cn",
-						heading: "红牌警告",
-						title: "检测到当前网络出口不是 CN 直连",
-						message: "请确认浏览器当前网络是否经过了 代理、VPN 或 境外网络，\n在线优选仅有 CN 直连网络环境才可以实现！\n当前网络环境无法进行在线优选，可尝试使用「本地优选」。",
-						rows: nonCn,
+						kind: "request-failed",
+						heading: "黄牌警告",
+						title: "优选域名请求失败",
+						message: "当前网络环境无法进行在线优选，但可尝试使用「本地优选」。\n请自行检查网络环境，确保优选域名可访问。",
+						rows: entries,
 						details: completed
 					};
-				}
-
-				return {
-					kind: "request-failed",
-					heading: "黄牌警告",
-					title: "优选域名请求失败",
-					message: "当前网络环境无法进行在线优选，但可尝试使用「本地优选」。\n请自行检查网络环境，确保优选域名可访问。",
-					rows: entries,
-					details: completed
-				};
 				}
 
 				function renderNetworkWarning(context) {
@@ -16427,27 +16780,92 @@
 				<div class="api-form-row-item">
 					<label for="chainProxyHost">优选域名/IP:</label>
 					<div class="chain-proxy-preferred-wrapper">
-						<input type="text" id="chainProxyHost" title="优选域名/IP" placeholder="当前网页域名">
+						<input type="text" id="chainProxyHost" title="优选域名/IP" placeholder="当前网页域名"
+							onpaste="handleChainProxyHostPaste(event)" onchange="sanitizeChainProxyHostInput()">
 						<span class="proxy-protocol-separator">:</span>
 						<input type="text" id="chainProxyPort" title="优选端口 1~65535，可留空" inputmode="numeric"
 							placeholder="可选" oninput="normalizeChainProxyPortInput()">
 					</div>
 				</div>
+			</div>
 
-				<div class="api-form-row-item chain-proxy-protocol-row">
-					<label for="chainProxyProtocol">链式代理:</label>
-					<div class="chain-proxy-input-wrapper">
-						<select id="chainProxyProtocol" title="链式代理协议" onchange="resetChainProxyValidation()">
-							<option value="socks5">socks5</option>
-							<option value="http">http</option>
-							<option value="https">https</option>
-							<option value="turn">turn</option>
-							<option value="sstp">sstp</option>
-						</select>
-						<span class="proxy-protocol-separator">://</span>
-						<input type="text" id="chainProxyAddress" title="链式代理地址" placeholder="user:pass@127.0.0.1:1080"
-							oninput="sanitizeChainProxyAddressInput(); updateChainProxyVerifyState()"
-							onchange="sanitizeChainProxyAddressInput(); updateChainProxyVerifyState()">
+			<div class="chain-source-header">
+				<div class="chain-source-label" id="chainSourceLabel">代理来源</div>
+				<div class="chain-source-switch" role="tablist" aria-labelledby="chainSourceLabel">
+					<button type="button" class="chain-source-option is-active" id="chainSourceManualBtn" role="tab"
+						aria-selected="true" aria-controls="chainManualPanel" onclick="setChainProxySource('manual')"
+						title="手动填写自己的代理地址，验证通过后再添加">
+						<span class="chain-source-option-title">✍️ 自己填写</span>
+						<span class="chain-source-option-desc">支持 socks5 / http / https / turn / sstp</span>
+					</button>
+					<button type="button" class="chain-source-option" id="chainSourceLibraryBtn" role="tab"
+						aria-selected="false" aria-controls="chainLibPanel"
+						onclick="setChainProxySource('library', { adoptManualProtocol: true })"
+						title="从公开代理库中选择已通过可用性验证的代理，选中即可添加">
+						<span class="chain-source-option-title">🎁 CM代理池</span>
+						<span class="chain-source-option-desc">已验可用 · 选中即添加</span>
+					</button>
+				</div>
+			</div>
+
+			<div class="chain-lib-panel" id="chainLibPanel" role="tabpanel" aria-labelledby="chainSourceLibraryBtn"
+				hidden>
+				<div class="chain-lib-filter-row">
+					<div class="chain-lib-protocols" id="chainLibProtocols" role="group" aria-label="公开代理协议">
+						<button type="button" class="chain-lib-protocol is-active" data-protocol="socks5"
+							onclick="setChainLibProtocol('socks5')">socks5</button>
+						<button type="button" class="chain-lib-protocol" data-protocol="http"
+							onclick="setChainLibProtocol('http')">http</button>
+						<button type="button" class="chain-lib-protocol" data-protocol="https"
+							onclick="setChainLibProtocol('https')">https</button>
+					</div>
+					<button type="button" class="chain-lib-refresh" id="chainLibRefreshBtn"
+						onclick="refreshChainLibList()">↻ 刷新列表</button>
+				</div>
+
+				<div class="api-form-row-item chain-lib-field">
+					<label for="chainLibRegionSelect">目标地区:</label>
+					<select id="chainLibRegionSelect" title="选择代理所在地区，选后自动测速" onchange="onChainLibRegionChange()">
+						<option value="">正在加载...</option>
+					</select>
+				</div>
+
+				<div class="api-form-row-item chain-lib-field">
+					<label for="chainLibProxySelect">选择代理:</label>
+					<select id="chainLibProxySelect" title="可用代理按延迟排序，灰色为不可用" onchange="onChainLibProxySelectChange()">
+						<option value="">请先选择地区</option>
+					</select>
+				</div>
+
+				<div class="chain-lib-meta" id="chainLibMeta"></div>
+
+				<div class="chain-lib-map-card" id="chainLibMapCard" hidden>
+					<div id="proxy-map-chain" class="proxy-map-container"></div>
+					<span class="chain-lib-map-badge" id="chainLibMapBadge">选择代理后显示落地位置</span>
+				</div>
+
+				<div class="chain-lib-empty" id="chainLibEmpty" role="status"></div>
+			</div>
+
+			<div class="chain-manual-panel" id="chainManualPanel" role="tabpanel"
+				aria-labelledby="chainSourceManualBtn">
+				<div class="api-form-group">
+					<div class="api-form-row-item chain-proxy-protocol-row">
+						<label for="chainProxyProtocol">链式代理:</label>
+						<div class="chain-proxy-input-wrapper">
+							<select id="chainProxyProtocol" title="链式代理协议" onchange="resetChainProxyValidation()">
+								<option value="socks5">socks5</option>
+								<option value="http">http</option>
+								<option value="https">https</option>
+								<option value="turn">turn</option>
+								<option value="sstp">sstp</option>
+							</select>
+							<span class="proxy-protocol-separator">://</span>
+							<input type="text" id="chainProxyAddress" title="链式代理地址"
+								placeholder="user:pass@127.0.0.1:1080"
+								oninput="sanitizeChainProxyAddressInput(); updateChainProxyVerifyState()"
+								onchange="sanitizeChainProxyAddressInput(); updateChainProxyVerifyState()">
+						</div>
 					</div>
 				</div>
 			</div>
@@ -17422,7 +17840,8 @@
 				</ol>
 			</div>
 			<div class="grpc-modal-actions">
-				<button type="button" class="btn grpc-modal-confirm-btn" onclick="hideTransportGrpcTooltip()">我已开启 gRPC</button>
+				<button type="button" class="btn grpc-modal-confirm-btn" onclick="hideTransportGrpcTooltip()">我已开启
+					gRPC</button>
 			</div>
 		</div>
 	</div>
@@ -20533,24 +20952,6 @@
 				getMoreBtn.style.display = isProxyIPMode ? 'inline-block' : 'none';
 			}
 
-			// 更新 "探索更多SOCKS5" 按钮的显示状态
-			const exploreSocks5Btn = document.getElementById('exploreSocks5Btn');
-			if (exploreSocks5Btn) {
-				exploreSocks5Btn.style.display = mode === 'socks5' ? 'inline-block' : 'none';
-			}
-
-			// 更新 "探索更多HTTP" 按钮的显示状态
-			const exploreHTTPBtn = document.getElementById('exploreHTTPBtn');
-			if (exploreHTTPBtn) {
-				exploreHTTPBtn.style.display = mode === 'http' ? 'inline-block' : 'none';
-			}
-
-			// 更新 "探索更多HTTPS" 按钮的显示状态
-			const exploreHTTPSBtn = document.getElementById('exploreHTTPSBtn');
-			if (exploreHTTPSBtn) {
-				exploreHTTPSBtn.style.display = mode === 'https' && httpsProxyFeatureEnabled ? 'inline-block' : 'none';
-			}
-
 			// 更新 "路径模板配置" 按钮的显示状态
 			const pathTemplateConfigBtn = document.getElementById('pathTemplateConfigBtn');
 			if (pathTemplateConfigBtn) {
@@ -23379,6 +23780,495 @@
 			closeProxyVerificationModal();
 		}
 
+		// ==================== 链式代理：公开代理库 ====================
+		// 协议注册表：以后新增协议（如 sstp/turn）只需在下面加一项、把 available 改为 true，
+		// 并补上对应的 proxyConfigs 数据源，页面上的协议胶囊会自动生成，无需改 HTML/CSS。
+		const CHAIN_LIB_REGISTRY = [
+			{ protocol: 'socks5', available: true },
+			{ protocol: 'http', available: true },
+			{ protocol: 'https', available: true },
+			{ protocol: 'turn', available: false },
+			{ protocol: 'sstp', available: false }
+		];
+		const CHAIN_LIB_PROTOCOLS = CHAIN_LIB_REGISTRY
+			.filter(item => item.available)
+			.map(item => item.protocol);
+		const chainLibConfigKeys = Object.fromEntries(
+			CHAIN_LIB_REGISTRY.map(item => [item.protocol, `chain_${item.protocol}`])
+		);
+		let chainProxySourceMode = 'manual';
+		let chainLibProtocol = 'socks5';
+		let chainLibAutoAppliedValue = null;
+		let chainLibRegionProtocol = null;
+		const chainLibMapState = { map: null, marker: null };
+
+		function getChainLibConfigKey(protocol = chainLibProtocol) {
+			return chainLibConfigKeys[protocol] || chainLibConfigKeys.socks5;
+		}
+
+		function getChainLibConfig(protocol = chainLibProtocol) {
+			return proxyConfigs[getChainLibConfigKey(protocol)];
+		}
+
+		// 协议胶囊按注册表渲染，数量增加时自动换行，不再依赖固定列数
+		function renderChainLibProtocols() {
+			const container = document.getElementById('chainLibProtocols');
+			if (!container) return;
+
+			if (!CHAIN_LIB_PROTOCOLS.includes(chainLibProtocol)) {
+				chainLibProtocol = CHAIN_LIB_PROTOCOLS[0] || 'socks5';
+			}
+
+			container.innerHTML = CHAIN_LIB_PROTOCOLS.map(protocol =>
+				`<button type="button" class="chain-lib-protocol" data-protocol="${protocol}" ` +
+				`title="筛选 ${protocol} 协议的公开代理" onclick="setChainLibProtocol('${protocol}')">${protocol}</button>`
+			).join('');
+			syncChainLibProtocolChips();
+		}
+
+		function updateChainLibMeta() {
+			const metaEl = document.getElementById('chainLibMeta');
+			const regionSelect = document.getElementById('chainLibRegionSelect');
+			if (!metaEl || !regionSelect) return;
+
+			const config = getChainLibConfig();
+			const listData = (config && window[config.listData]) || [];
+			if (!listData.length) {
+				metaEl.textContent = '';
+				return;
+			}
+
+			const countryMap = window[config.countryMap] || {};
+			const region = regionSelect.value;
+			if (!region) {
+				metaEl.textContent = `${chainLibProtocol} · ${Object.keys(countryMap).length} 个地区 · ${listData.length} 个代理`;
+				return;
+			}
+
+			const proxies = countryMap[region] || [];
+			const status = window[config.verificationStatus] || {};
+			const passed = proxies.filter(item => status[item.proxy] && status[item.proxy].status === 'success').length;
+			const settled = proxies.filter(item => status[item.proxy] && status[item.proxy].status !== 'pending').length;
+			const rawLabel = String(regionSelect.selectedOptions?.[0]?.textContent || region).replace(/\s*\(\d+\)\s*$/, '').trim();
+			metaEl.textContent = `${rawLabel} · 可用 ${passed}/${proxies.length}` +
+				(settled < proxies.length ? ` · 测速中 ${settled}/${proxies.length}` : '');
+		}
+
+		function setChainProxySource(mode, options = {}) {
+			const targetMode = mode === 'manual' ? 'manual' : 'library';
+			const libBtn = document.getElementById('chainSourceLibraryBtn');
+			const manualBtn = document.getElementById('chainSourceManualBtn');
+			const libPanel = document.getElementById('chainLibPanel');
+			const manualPanel = document.getElementById('chainManualPanel');
+			const verifyBtn = document.getElementById('btnVerifyChainProxy');
+			if (!libBtn || !manualBtn || !libPanel || !manualPanel) return;
+
+			const isLibrary = targetMode === 'library';
+			chainProxySourceMode = targetMode;
+			libBtn.classList.toggle('is-active', isLibrary);
+			manualBtn.classList.toggle('is-active', !isLibrary);
+			libBtn.setAttribute('aria-selected', String(isLibrary));
+			manualBtn.setAttribute('aria-selected', String(!isLibrary));
+			libPanel.hidden = !isLibrary;
+			manualPanel.hidden = isLibrary;
+			if (verifyBtn) verifyBtn.style.display = isLibrary ? 'none' : '';
+
+			if (!isLibrary) {
+				abortChainLibVerification();
+				resetProxyDisplayUpdateState(getChainLibConfigKey());
+				return;
+			}
+
+			// 进入公开库时，若手动模式所选协议也在库内，则自动跟随该协议
+			if (options.adoptManualProtocol) {
+				const manualProtocol = String(document.getElementById('chainProxyProtocol')?.value || 'socks5');
+				if (CHAIN_LIB_PROTOCOLS.includes(manualProtocol) && manualProtocol !== chainLibProtocol) {
+					chainLibProtocol = manualProtocol;
+					chainLibAutoAppliedValue = null;
+					resetChainProxyAddState();
+					hideChainProxyStatus();
+					resetChainLibMap();
+					hideChainLibEmpty();
+					const proxySelect = document.getElementById('chainLibProxySelect');
+					if (proxySelect) proxySelect.innerHTML = '<option value="">请先选择地区</option>';
+				}
+			}
+
+			syncChainLibProtocolChips();
+			renderChainLibProtocols();
+			initChainLib();
+			ensureProxySelectListeners(getChainLibConfigKey());
+			setTimeout(() => { initChainLibMap(); }, 260);
+		}
+
+		function syncChainLibProtocolChips() {
+			document.querySelectorAll('#chainLibPanel .chain-lib-protocol').forEach(btn => {
+				btn.classList.toggle('is-active', btn.dataset.protocol === chainLibProtocol);
+			});
+		}
+
+		function setChainLibProtocol(protocol) {
+			if (!CHAIN_LIB_PROTOCOLS.includes(protocol) || protocol === chainLibProtocol) return;
+
+			const previousKey = getChainLibConfigKey();
+			abortChainLibVerification(previousKey);
+			resetProxyDisplayUpdateState(previousKey);
+
+			chainLibProtocol = protocol;
+			chainLibAutoAppliedValue = null;
+			syncChainLibProtocolChips();
+			resetChainProxyAddState();
+			hideChainProxyStatus();
+			resetChainLibMap();
+			hideChainLibEmpty();
+
+			const proxySelect = document.getElementById('chainLibProxySelect');
+			if (proxySelect) proxySelect.innerHTML = '<option value="">请先选择地区</option>';
+			initChainLib();
+		}
+
+		function initChainLib() {
+			const key = getChainLibConfigKey();
+			const config = proxyConfigs[key];
+			const regionSelect = document.getElementById('chainLibRegionSelect');
+			const proxySelect = document.getElementById('chainLibProxySelect');
+			if (!config || !regionSelect || !proxySelect) return;
+
+			// 验证状态/计时器容器必须存在，否则首次验证写入时会抛错
+			window[config.verificationStatus] = window[config.verificationStatus] || {};
+			window[config.verificationTimeouts] = window[config.verificationTimeouts] || {};
+
+			const listData = window[config.listData];
+			if (Array.isArray(listData) && listData.length) {
+				hideChainLibEmpty();
+				// 缓存命中时保留用户上次选择的地区，但换协议后必须按新协议重建地区列表
+				const hasRegionOptions = !!regionSelect.querySelector('option[value]:not([value=""])');
+				if (!hasRegionOptions || chainLibRegionProtocol !== chainLibProtocol) {
+					populateProxyRegionSelect(key);
+					chainLibRegionProtocol = chainLibProtocol;
+				}
+				updateChainLibMeta();
+				return;
+			}
+
+			window[config.listData] = [];
+			window[config.countryMap] = {};
+			regionSelect.innerHTML = '<option value="">正在加载公开代理...</option>';
+			proxySelect.innerHTML = '<option value="">请先选择地区</option>';
+			hideChainLibEmpty();
+			updateChainLibMeta();
+			loadChainLibList(key);
+		}
+
+		function loadChainLibList(key) {
+			const config = proxyConfigs[key];
+			if (!config) return;
+			const protocolLabel = String(key).replace('chain_', '').toUpperCase();
+
+			fetchWithAutoMirror(config.url, config.description)
+				.then(text => {
+					if (getChainLibConfigKey() !== key) return; // 协议已切换，丢弃过期结果
+					let listData = null;
+					try {
+						listData = JSON.parse(text);
+					} catch (error) {
+						listData = null;
+					}
+					if (!Array.isArray(listData)) throw new Error('代理列表格式异常');
+
+					window[config.listData] = listData;
+					window[config.countryMap] = buildCountryMap(listData, {});
+
+					if (!listData.length) {
+						document.getElementById('chainLibRegionSelect').innerHTML = '<option value="">暂无可用地区</option>';
+						showChainLibEmpty(`公开 ${protocolLabel} 代理暂未上线，可切换其他协议，或改用「自己填写」。`);
+						return;
+					}
+
+					hideChainLibEmpty();
+					populateProxyRegionSelect(key);
+					chainLibRegionProtocol = chainLibProtocol;
+					updateChainLibMeta();
+				})
+				.catch(error => {
+					if (getChainLibConfigKey() !== key) return;
+					console.error('[链式代理] 公开代理列表加载失败:', error);
+					document.getElementById('chainLibRegionSelect').innerHTML = '<option value="">加载失败</option>';
+					showChainLibEmpty('公开代理列表加载失败，请稍后重试，或切换到「自己填写」。');
+				});
+		}
+
+		function onChainLibRegionChange() {
+			const key = getChainLibConfigKey();
+			const config = proxyConfigs[key];
+			const regionSelect = document.getElementById('chainLibRegionSelect');
+			const proxySelect = document.getElementById('chainLibProxySelect');
+			if (!config || !regionSelect || !proxySelect) return;
+
+			chainLibAutoAppliedValue = null;
+			resetChainProxyAddState();
+			hideChainProxyStatus();
+			resetChainLibMap();
+
+			if (!regionSelect.value) {
+				proxySelect.innerHTML = '<option value="">请先选择地区</option>';
+				updateChainLibMeta();
+				return;
+			}
+
+			proxySelect.innerHTML = '<option value="">正在验证可用性，请稍候...</option>';
+			ensureProxySelectListeners(key);
+			resetProxyDisplayUpdateState(key);
+			onProxyRegionChange(key);
+			updateChainLibMeta();
+		}
+
+		function onChainLibProxySelectChange() {
+			const key = getChainLibConfigKey();
+			const config = proxyConfigs[key];
+			const proxySelect = document.getElementById('chainLibProxySelect');
+			if (!config || !proxySelect) return;
+
+			const proxyUrl = proxySelect.value || '';
+			chainLibAutoAppliedValue = proxyUrl || null;
+
+			const status = proxyUrl ? window[config.verificationStatus][proxyUrl] : null;
+			if (!proxyUrl || !status || status.status !== 'success') {
+				resetChainProxyAddState();
+				hideChainProxyStatus();
+				return;
+			}
+
+			const proxyData = (window[config.listData] || []).find(item => item.proxy === proxyUrl) || null;
+			applyChainLibSelection(chainLibProtocol, proxyUrl, proxyData, status);
+		}
+
+		function applyChainLibSelection(protocol, proxyUrl, proxyData, status) {
+			const protocolSelect = document.getElementById('chainProxyProtocol');
+			const addressInput = document.getElementById('chainProxyAddress');
+			const addBtn = document.getElementById('btnAddChainProxy');
+			const nodeNameInput = document.getElementById('chainProxyNodeName');
+			if (!protocolSelect || !addressInput || !addBtn) return;
+
+			const cleanProtocol = CHAIN_LIB_PROTOCOLS.includes(protocol) ? protocol : 'socks5';
+			const cleanAddress = processProxyAddressForValidation(proxyUrl, cleanProtocol);
+			if (!cleanAddress) return;
+
+			// 同步回「自己填写」表单，便于用户切过去继续微调
+			protocolSelect.value = cleanProtocol;
+			addressInput.value = cleanAddress;
+
+			const loc = proxyData
+				? `[${proxyData.country || '未知'}]${proxyData.country_cn || proxyData.country_en || ''}`
+				: '未知';
+			const ip = (proxyData && (proxyData.clientIp || proxyData.ip)) || '未知';
+			const latency = status && status.responseTime > 0 ? `${status.responseTime}ms` : '未知';
+			const defaultNodeName = buildChainProxyDefaultNodeName(loc, cleanProtocol);
+			if (nodeNameInput && !String(nodeNameInput.value || '').trim()) {
+				nodeNameInput.placeholder = defaultNodeName;
+			}
+
+			const previewHost = normalizeChainProxyPreferredHost(
+				document.getElementById('chainProxyHost')?.value || getDefaultChainProxyHost()
+			);
+			const previewPort = String(document.getElementById('chainProxyPort')?.value || '').trim();
+
+			showChainProxyStatus(
+				renderChainProxyAvailabilitySuccessCard({
+					ip,
+					loc,
+					responseTimeDisplay: latency,
+					preferredHost: previewHost,
+					preferredPort: previewPort,
+					protocol: cleanProtocol,
+					proxyAddress: cleanAddress,
+					sourceTag: '公开库'
+				}),
+				'chain-success',
+				true
+			);
+
+			addBtn.disabled = false;
+			addBtn.dataset.validProtocol = cleanProtocol;
+			addBtn.dataset.validAddress = cleanAddress;
+			addBtn.dataset.validKey = getChainProxyValidationKey(cleanProtocol, cleanAddress);
+			addBtn.dataset.defaultNodeName = defaultNodeName;
+
+			updateChainLibMap(proxyData);
+		}
+
+		function refreshChainLibList() {
+			const config = getChainLibConfig();
+			const proxySelect = document.getElementById('chainLibProxySelect');
+			const hasSelection = !!(proxySelect && proxySelect.value);
+
+			// 已选中具体代理：对该代理重新验证一次
+			if (hasSelection) {
+				verifyChainProxyAvailability();
+				return;
+			}
+
+			// 未选代理：重新拉取当前协议的列表
+			if (!config) return;
+			window[config.listData] = [];
+			window[config.countryMap] = {};
+			chainLibRegionProtocol = null;
+			chainLibAutoAppliedValue = null;
+			resetChainProxyAddState();
+			hideChainProxyStatus();
+			resetChainLibMap();
+			hideChainLibEmpty();
+
+			const regionSelect = document.getElementById('chainLibRegionSelect');
+			if (regionSelect) regionSelect.innerHTML = '<option value="">正在加载...</option>';
+			if (proxySelect) proxySelect.innerHTML = '<option value="">请先选择地区</option>';
+			initChainLib();
+			showToast('正在刷新代理列表…', 'info');
+		}
+
+		function abortChainLibVerification(key = getChainLibConfigKey()) {
+			const config = proxyConfigs[key];
+			if (!config) return;
+			if (config.abortController) {
+				config.abortController.abort();
+				config.abortController = null;
+			}
+			Object.values(window[config.verificationTimeouts] || {}).forEach(timeoutId => clearTimeout(timeoutId));
+			window[config.verificationTimeouts] = {};
+		}
+
+		function resetChainProxyAddState() {
+			const addBtn = document.getElementById('btnAddChainProxy');
+			if (!addBtn) return;
+			addBtn.disabled = true;
+			delete addBtn.dataset.validProtocol;
+			delete addBtn.dataset.validAddress;
+			delete addBtn.dataset.validKey;
+			delete addBtn.dataset.defaultNodeName;
+		}
+
+		function hideChainProxyStatus() {
+			const statusEl = document.getElementById('chainProxyStatus');
+			if (!statusEl) return;
+			statusEl.style.display = 'none';
+			statusEl.innerHTML = '';
+		}
+
+		function showChainLibEmpty(message) {
+			const emptyEl = document.getElementById('chainLibEmpty');
+			if (!emptyEl) return;
+			emptyEl.textContent = message;
+			emptyEl.classList.add('is-visible');
+		}
+
+		function hideChainLibEmpty() {
+			const emptyEl = document.getElementById('chainLibEmpty');
+			if (!emptyEl) return;
+			emptyEl.classList.remove('is-visible');
+			emptyEl.textContent = '';
+		}
+
+		function initChainLibMap() {
+			const container = document.getElementById('proxy-map-chain');
+			if (!container || typeof L === 'undefined') return null;
+			if (chainLibMapState.map) {
+				chainLibMapState.map.invalidateSize();
+				return chainLibMapState.map;
+			}
+			if (!container.offsetWidth) return null; // 面板不可见时暂不初始化，等下次可见再建
+
+			const map = L.map('proxy-map-chain', {
+				zoomControl: false,
+				attributionControl: false
+			}).setView([22.2783, 114.1747], 3);
+
+			L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}', {
+				subdomains: '1234',
+				minZoom: 1,
+				maxZoom: 18
+			}).addTo(map);
+
+			chainLibMapState.map = map;
+			return map;
+		}
+
+		function buildChainLibMapPopup(proxyData) {
+			const safe = value => escapeMarkdownHtml(String(value ?? ''));
+			return `
+				<div class="ip-detail-popup-city">${safe(proxyData.city || proxyData.country_cn || '位置')}</div>
+				<div class="ip-detail-popup-item">
+					<span class="ip-detail-popup-label">国家:</span>
+					<span class="ip-detail-popup-value">[${safe(proxyData.country || '-')}]${safe(proxyData.country_cn || '')}</span>
+				</div>
+				<div class="ip-detail-popup-item">
+					<span class="ip-detail-popup-label">落地IP:</span>
+					<span class="ip-detail-popup-value">${safe(proxyData.clientIp || proxyData.ip || '-')}</span>
+				</div>
+				<div class="ip-detail-popup-item">
+					<span class="ip-detail-popup-label">ASN:</span>
+					<span class="ip-detail-popup-value">${safe(proxyData.asn || '')}</span>
+				</div>
+				<div class="ip-detail-popup-item">
+					<span class="ip-detail-popup-label">运营商:</span>
+					<span class="ip-detail-popup-value">${safe(proxyData.asOrganization || '未知')}</span>
+				</div>
+			`;
+		}
+
+		function updateChainLibMap(proxyData) {
+			const badge = document.getElementById('chainLibMapBadge');
+			const mapCard = document.getElementById('chainLibMapCard');
+			const lat = parseFloat(proxyData?.latitude);
+			const lng = parseFloat(proxyData?.longitude);
+			// 没有坐标就不展开地图，避免出现一大块空白区域
+			if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+				if (mapCard) mapCard.hidden = true;
+				if (badge) badge.textContent = '该代理暂无可显示的地理坐标';
+				return;
+			}
+			if (mapCard) mapCard.hidden = false;
+
+			const map = initChainLibMap();
+			if (!map) return;
+			map.invalidateSize();
+
+			if (chainLibMapState.marker) {
+				chainLibMapState.marker.setLatLng([lat, lng]);
+			} else {
+				chainLibMapState.marker = L.marker([lat, lng]).addTo(map);
+			}
+
+			// 让标记落在可视区偏下位置，避免气泡被顶部遮挡
+			const mapSize = map.getSize();
+			const offsetY = mapSize.y * 0.18;
+			const point = map.project([lat, lng], 4).subtract([0, offsetY]);
+			const offsetCenter = map.unproject(point, 4);
+			if (isLowPerformanceMode) {
+				map.setView(offsetCenter, 4, { animate: false });
+			} else {
+				map.flyTo(offsetCenter, 4, { duration: 1.2 });
+			}
+
+			chainLibMapState.marker
+				.bindPopup(buildChainLibMapPopup(proxyData), { offset: L.point(0, -32) })
+				.openPopup();
+
+			if (badge) {
+				badge.textContent = `${proxyData.country_emoji || '🌐'} ${proxyData.city || proxyData.country_cn || '落地位置'}`;
+			}
+		}
+
+		function resetChainLibMap() {
+			if (chainLibMapState.marker && chainLibMapState.map) {
+				chainLibMapState.map.removeLayer(chainLibMapState.marker);
+			}
+			chainLibMapState.marker = null;
+			const mapCard = document.getElementById('chainLibMapCard');
+			if (mapCard) mapCard.hidden = true;
+			const badge = document.getElementById('chainLibMapBadge');
+			if (badge) badge.textContent = '选择代理后显示落地位置';
+		}
+
 		function getDefaultChainProxyHost() {
 			const hostname = String(window.location.hostname || '').trim();
 			return hostname || String(document.getElementById('nodeHost')?.value || '').trim();
@@ -23421,11 +24311,30 @@
 			}
 
 			updateChainProxyVerifyState(false);
+
+			// 每次打开都从干净的公开库状态开始（代理列表仍复用缓存，不重复下载）
+			chainLibAutoAppliedValue = null;
+			const libRegionSelect = document.getElementById('chainLibRegionSelect');
+			const libProxySelect = document.getElementById('chainLibProxySelect');
+			if (libRegionSelect) libRegionSelect.value = '';
+			if (libProxySelect) libProxySelect.innerHTML = '<option value="">请先选择地区</option>';
+			resetChainLibMap();
+			hideChainLibEmpty();
+
 			modal.classList.add('show');
-			setTimeout(() => addressInput.focus(), 0);
+			setChainProxySource(chainProxySourceMode, { adoptManualProtocol: false });
+
+			const focusTarget = chainProxySourceMode === 'library'
+				? document.getElementById('chainLibRegionSelect')
+				: addressInput;
+			setTimeout(() => {
+				if (focusTarget) focusTarget.focus();
+			}, 0);
 		}
 
 		function closeChainProxyModal() {
+			abortChainLibVerification();
+			resetProxyDisplayUpdateState(getChainLibConfigKey());
 			document.getElementById('chainProxyModal')?.classList.remove('show');
 		}
 
@@ -23539,6 +24448,74 @@
 			portInput.value = value;
 		}
 
+		// 把 "host:port" / "[IPv6]:port" / "https://host:port/path" 拆成主机与端口；
+		// 裸 IPv6（多个冒号、无方括号）不拆，避免把地址拆坏
+		function splitChainProxyHostPort(rawValue) {
+			let value = String(rawValue == null ? '' : rawValue).trim();
+			if (!value) return { host: '', port: '' };
+
+			value = value.replace(/：/g, ':');                       // 全角冒号
+			value = value.replace(/^[a-z][a-z0-9+.-]*:\/\//i, '');    // 误粘的协议前缀
+			value = value.replace(/[/?#].*$/, '').trim();             // 尾随路径/参数
+			if (!value) return { host: '', port: '' };
+
+			const bracketed = value.match(/^(\[[^\]]+\])\s*:\s*(\d{1,5})$/);
+			if (bracketed && Number(bracketed[2]) >= 1 && Number(bracketed[2]) <= 65535) {
+				return { host: bracketed[1], port: bracketed[2] };
+			}
+
+			if ((value.match(/:/g) || []).length !== 1) return { host: value, port: '' };
+
+			const colonIndex = value.indexOf(':');
+			const host = value.slice(0, colonIndex).trim();
+			const port = value.slice(colonIndex + 1).trim();
+			if (!host) return { host: value, port: '' };
+			if (!port) return { host, port: '' };
+			if (!/^\d{1,5}$/.test(port)) return { host: value, port: '' };
+			const portNumber = Number(port);
+			if (portNumber < 1 || portNumber > 65535) return { host: value, port: '' };
+			return { host, port };
+		}
+
+		function sanitizeChainProxyHostInput() {
+			const hostInput = document.getElementById('chainProxyHost');
+			if (!hostInput) return;
+
+			const raw = String(hostInput.value || '');
+			const parsed = splitChainProxyHostPort(raw);
+			if (parsed.host !== raw) {
+				hostInput.value = parsed.host;
+			}
+			if (!parsed.port) return;
+
+			const portInput = document.getElementById('chainProxyPort');
+			if (portInput) {
+				portInput.value = parsed.port;
+				normalizeChainProxyPortInput();
+			}
+		}
+
+		function handleChainProxyHostPaste(event) {
+			const clipboard = event.clipboardData || window.clipboardData;
+			const text = clipboard ? clipboard.getData('text') : '';
+			if (!text) return;
+
+			const parsed = splitChainProxyHostPort(text);
+			// 没识别出端口就交给浏览器默认粘贴，失焦时再统一清洗
+			if (!parsed.port) return;
+
+			event.preventDefault();
+			const hostInput = document.getElementById('chainProxyHost');
+			if (!hostInput) return;
+			hostInput.value = parsed.host;
+
+			const portInput = document.getElementById('chainProxyPort');
+			if (portInput) {
+				portInput.value = parsed.port;
+				normalizeChainProxyPortInput();
+			}
+		}
+
 		function showChainProxyStatus(message, type = 'info', asHtml = false) {
 			const statusEl = document.getElementById('chainProxyStatus');
 			if (!statusEl) return;
@@ -23605,7 +24582,8 @@
 				preferredHost,
 				preferredPort,
 				protocol,
-				proxyAddress
+				proxyAddress,
+				sourceTag
 			} = options || {};
 			const safeIp = escapeMarkdownHtml(ip || '未知');
 			const safeLoc = escapeMarkdownHtml(loc || '未知');
@@ -23615,6 +24593,7 @@
 			const safeProtocol = escapeMarkdownHtml(protocol || 'socks5');
 			const safeProtocolLabel = escapeMarkdownHtml(`${protocol || 'socks5'}代理`);
 			const safeProxyAddress = escapeMarkdownHtml(maskChainProxyAddressForDisplay(proxyAddress || ''));
+			const safeSourceTag = escapeMarkdownHtml(sourceTag || '');
 
 			return `
 				<div class="chain-verify-card">
@@ -23623,7 +24602,10 @@
 							<span class="chain-verify-dot"></span>
 							<span>验证通过</span>
 						</div>
-						<span class="chain-verify-badge" title="地区: ${safeLoc} ${safeResponseTime}">地区: ${safeBadgeRegion} ${safeResponseTime}</span>
+						<div class="chain-verify-meta">
+							${safeSourceTag ? `<span class="chain-verify-source">${safeSourceTag}</span>` : ''}
+							<span class="chain-verify-badge" title="地区: ${safeLoc} ${safeResponseTime}">地区: ${safeBadgeRegion} ${safeResponseTime}</span>
+						</div>
 					</div>
 
 					<div class="chain-verify-body">
@@ -23774,6 +24756,8 @@
 		}
 
 		function addChainProxyNode() {
+			// 兜底：若用户粘贴后没触发 change（例如直接点添加），这里再清洗一次
+			sanitizeChainProxyHostInput();
 			const addBtn = document.getElementById('btnAddChainProxy');
 			const validProtocol = addBtn?.dataset.validProtocol || '';
 			const validAddress = addBtn?.dataset.validAddress || '';
@@ -25907,6 +26891,8 @@
 			initLineEditor('customIPs');
 			initNodeUUIDEasterEgg();
 			initVersionCopyEasterEgg();
+			// 按协议注册表生成公开库的协议胶囊（新增协议后无需改 HTML）
+			renderChainLibProtocols();
 			// 独立预加载 SubConfig 数据，不阻塞主流程
 			loadSubConfigData().catch(err => console.error('SubConfig预加载失败:', err));
 		});
@@ -26629,10 +27615,12 @@
 			setStatus('status-overseas', 'loading');
 			// API 配置：URL + 字段映射
 			const apis = [
+				/*
 				{
 					url: `https://api.ipapi.is`,
 					parse: d => ({ ip: d.ip, loc: `${d.cc || '未知'} AS${d.asn_num || ''} ${d.asn_org || ''}`.trim() })
 				},
+				*/
 				{
 					url: `https://api.cmliussss.net/api/ipinfo`,
 					parse: d => ({ ip: d.ip, loc: `${d.country_code || '未知'} ${d.asn || ''} ${d.as_name || ''}`.trim() })
@@ -27828,6 +28816,28 @@
 			}
 		};
 
+		// 链式代理「公开代理库」：复用 socks5 / http / https 三个协议的列表与验证结果
+		['socks5', 'http', 'https'].forEach(protocol => {
+			const baseConfig = proxyConfigs[protocol];
+			proxyConfigs[`chain_${protocol}`] = {
+				...baseConfig,
+				modalId: 'chainProxyModal',
+				regionSelectId: 'chainLibRegionSelect',
+				proxySelectId: 'chainLibProxySelect',
+				proxySelectGroupId: '',
+				confirmBtnId: 'btnAddChainProxy',
+				inputId: 'chainProxyAddress',
+				abortController: null,
+				chainLib: true,
+				verifySingleFunction: (proxy, signal) => verifySingleProxy(proxy, protocol, signal)
+					.then(() => {
+						if (chainProxySourceMode === 'library') {
+							updateProxyDisplay(`chain_${protocol}`);
+						}
+					})
+			};
+		});
+
 		// 存储SOCKS5数据
 		let socks5ListData = [];
 		let socks5CountryMap = {};
@@ -28319,10 +29329,11 @@
 				return;
 			}
 
-			const proxies = window[config.countryMap][selectedCountry] || [];
+			const proxies = window[config.countryMap]?.[selectedCountry] || [];
 
 			// 显示代理选择组
-			document.getElementById(config.proxySelectGroupId).style.display = 'block';
+			const proxySelectGroup = document.getElementById(config.proxySelectGroupId);
+			if (proxySelectGroup) proxySelectGroup.style.display = 'block';
 
 			// 初始化每个代理的验证状态
 			proxies.forEach(proxy => {
@@ -28350,8 +29361,11 @@
 			// 开始验证所有代理
 			verifyProxies(proxies, config.verifySingleFunction, () => {
 				updateProxyDisplay(type);
-				// 如果当前选中的是成功的，尝试更新地图
-				updateProxyMap(type);
+				// 链式代理公开库使用独立地图容器，这里只处理带地图的列表类型
+				if (proxyMaps[type]) {
+					// 如果当前选中的是成功的，尝试更新地图
+					updateProxyMap(type);
+				}
 			}, config.abortController.signal);
 		}
 
@@ -28361,7 +29375,10 @@
 			socks5: { lastUpdate: 0, pending: false, timer: null, selectOpen: false, listenersAdded: false },
 			http: { lastUpdate: 0, pending: false, timer: null, selectOpen: false, listenersAdded: false },
 			https: { lastUpdate: 0, pending: false, timer: null, selectOpen: false, listenersAdded: false },
-			proxyip: { lastUpdate: 0, pending: false, timer: null, selectOpen: false, listenersAdded: false }
+			proxyip: { lastUpdate: 0, pending: false, timer: null, selectOpen: false, listenersAdded: false },
+			chain_socks5: { lastUpdate: 0, pending: false, timer: null, selectOpen: false, listenersAdded: false },
+			chain_http: { lastUpdate: 0, pending: false, timer: null, selectOpen: false, listenersAdded: false },
+			chain_https: { lastUpdate: 0, pending: false, timer: null, selectOpen: false, listenersAdded: false }
 		};
 
 		// 为代理选择下拉框添加 focus/blur 监听，检测用户是否正在操作下拉框
@@ -28455,10 +29472,15 @@
 		// 实际执行更新的内部函数
 		function _doUpdateProxyDisplay(type) {
 			const state = proxyDisplayUpdateState[type];
+			if (!state) return;
 			state.lastUpdate = Date.now();
 			state.pending = false;
 
 			const config = proxyConfigs[type];
+			if (!config) return;
+			// 链式代理公开库只处理当前协议，避免旧协议的验证结果覆盖当前列表
+			if (config.chainLib && type !== getChainLibConfigKey()) return;
+
 			const selectedCountry = document.getElementById(config.regionSelectId).value;
 			if (selectedCountry) {
 				populateProxySelect(selectedCountry, config.proxySelectId, window[config.countryMap], window[config.verificationStatus], type);
@@ -28469,7 +29491,19 @@
 				const isValidSelected = selectedValue &&
 					window[config.verificationStatus][selectedValue] &&
 					window[config.verificationStatus][selectedValue].status === 'success';
-				document.getElementById(config.confirmBtnId).disabled = !isValidSelected;
+
+				if (config.chainLib) {
+					// 公开库：自动选中首个可用代理时，直接带入并展示验证结果
+					if (chainProxySourceMode === 'library' && selectedValue && selectedValue !== chainLibAutoAppliedValue) {
+						onChainLibProxySelectChange();
+					}
+					if (chainProxySourceMode === 'library') {
+						document.getElementById(config.confirmBtnId).disabled = !isValidSelected;
+					}
+					updateChainLibMeta();
+				} else {
+					document.getElementById(config.confirmBtnId).disabled = !isValidSelected;
+				}
 			}
 		}
 
@@ -28597,6 +29631,19 @@
 					.catch(error => {
 						clearTimeout(timeoutId);
 						delete window[config.verificationTimeouts][proxyUrl];
+
+						// 主动取消（切换地区/协议/关闭弹窗）不算代理失败，恢复为待验证状态
+						if (signal && signal.aborted) {
+							const currentStatus = window[config.verificationStatus][proxyUrl];
+							if (!currentStatus || currentStatus.status !== 'success') {
+								window[config.verificationStatus][proxyUrl] = {
+									status: 'pending',
+									responseTime: null
+								};
+							}
+							resolve();
+							return;
+						}
 
 						window[config.verificationStatus][proxyUrl] = {
 							status: 'failed',
