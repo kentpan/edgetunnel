@@ -23828,13 +23828,13 @@
 				let response;
 				let fromPrimary = false;
 				try {
-					response = await fetch(`https://api.ipapi.is/?q=${cleanIp}`, { signal: controller.signal });
+					response = await fetch(`https://api.090227.xyz/api/ipapi?ip=${cleanIp}`);
 					clearTimeout(timeoutId);
 					if (!response.ok) throw new Error('Primary API failed');
 					fromPrimary = true;
 				} catch (e) {
 					console.warn('Primary IP API failed, trying fallback...', e);
-					response = await fetch(`https://api.090227.xyz/api/ipapi?ip=${cleanIp}`);
+					response = await fetch(`https://api.ipapi.is/?q=${cleanIp}`, { signal: controller.signal });
 					if (!response.ok) throw new Error('Fallback API failed');
 				}
 
