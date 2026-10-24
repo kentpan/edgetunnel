@@ -6,7 +6,79 @@
 	<meta name="viewport" content="width=device-width,initial-scale=1">
 	<meta name="robots" content="noindex, nofollow">
 	<title>登录设置页面</title>
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
 	<style>
+		/* ============================================================
+		   设计令牌 —— 与 admin/index.html 完全对齐
+		   ============================================================ */
+		:root {
+			/* 页面与卡片 */
+			--admin-bg-base: #f8fafc;
+			--bg-primary: #ffffff;
+			--card-glass: rgba(255, 255, 255, 0.9);
+			--bg-secondary: rgba(255, 255, 255, 0.95);
+			/* 文本 */
+			--text-primary: #1f2937;
+			--text-secondary: #666;
+			--text-muted: #9ca3af;
+			/* 边框与输入 */
+			--border-color: #e5e7eb;
+			--border-light: rgba(255, 255, 255, 0.1);
+			--input-bg: #ffffff;
+			--input-border: #e5e7eb;
+			/* 遮罩 */
+			--overlay-bg: rgba(255, 255, 255, 0.66);
+			--dim-bg: rgba(15, 23, 42, 0.55);
+			/* 品牌渐变（两模式一致） */
+			--accent-a: #faab41;
+			--accent-b: #f6821f;
+			--accent-grad: linear-gradient(135deg, #faab41 0, #f6821f 100%);
+			--accent-grad-h: linear-gradient(90deg, #faab41 0, #f6821f 50%, #faab41 100%);
+			/* 焦点：亮=橙（与 admin 一致） */
+			--focus: #faab41;
+			--focus-ring: rgba(250, 171, 65, 0.12);
+			/* 错误 */
+			--error: #ef4444;
+			--error-deep: #dc2626;
+			--banner-warn-bg: #fef2f2;
+			--banner-warn-border: #dc2626;
+			--banner-warn-text: #991b1b;
+			/* 代码 chip */
+			--chip-bg: rgba(246, 130, 31, 0.1);
+			--chip-text: #c2410c;
+			/* 阴影 */
+			--shadow-card: 0 20px 60px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+			--icon-glow: 0 10px 30px rgba(246, 130, 31, 0.35)
+		}
+
+		html.dark-mode {
+			--admin-bg-base: #070b12;
+			--bg-primary: #1a1a1a;
+			--card-glass: rgba(26, 26, 26, 0.92);
+			--bg-secondary: #0f0d0a;
+			--text-primary: #e5e5e5;
+			--text-secondary: #a0a0a0;
+			--text-muted: #737373;
+			--border-color: #333333;
+			--border-light: rgba(255, 255, 255, 0.1);
+			--input-bg: #2a2a2a;
+			--input-border: #444444;
+			--overlay-bg: rgba(7, 11, 18, 0.78);
+			--dim-bg: rgba(0, 0, 0, 0.7);
+			/* 焦点：夜=紫（与 admin html.dark-mode 一致） */
+			--focus: #7c3aed;
+			--focus-ring: rgba(124, 58, 237, 0.12);
+			--banner-warn-bg: rgba(220, 38, 38, 0.12);
+			--banner-warn-border: #ef4444;
+			--banner-warn-text: #fca5a5;
+			--chip-bg: rgba(250, 171, 65, 0.12);
+			--chip-text: #fbbf24;
+			--shadow-card: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.08) inset;
+			--icon-glow: 0 10px 30px rgba(246, 130, 31, 0.22)
+		}
+
 		* {
 			margin: 0;
 			padding: 0;
@@ -14,8 +86,18 @@
 		}
 
 		body {
-			font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-			overflow: hidden
+			font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+			background: var(--admin-bg-base);
+			color: var(--text-primary);
+			overflow: hidden;
+			transition: background 0.35s ease, color 0.35s ease;
+			-webkit-font-smoothing: antialiased
+		}
+
+		:focus-visible {
+			outline: 2px solid var(--focus);
+			outline-offset: 2px;
+			border-radius: 4px
 		}
 
 		/* 通用动画 */
@@ -109,7 +191,7 @@
 			left: 0;
 			width: 100%;
 			height: 100%;
-			background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0, rgba(118, 75, 162, 0.15) 100%);
+			background: var(--overlay-bg);
 			-webkit-backdrop-filter: blur(12px);
 			backdrop-filter: blur(12px);
 			z-index: -2 !important;
@@ -135,16 +217,17 @@
 
 		/* 通用卡片容器 */
 		.card-container {
-			background: rgba(255, 255, 255, 0.95);
+			background: var(--card-glass);
 			-webkit-backdrop-filter: blur(20px);
 			backdrop-filter: blur(20px);
 			padding: 50px 40px;
 			border-radius: 24px;
-			box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+			box-shadow: var(--shadow-card);
 			width: 100%;
 			animation: containerAppear 1s ease-out .8s backwards;
 			position: relative;
-			overflow: hidden
+			overflow: hidden;
+			transition: background 0.35s ease
 		}
 
 		.card-container::before {
@@ -161,7 +244,7 @@
 
 		/* 页面标题和图标 */
 		.page-header {
-			margin-bottom: 35px;
+			margin-bottom: 32px;
 			text-align: center
 		}
 
@@ -169,12 +252,12 @@
 			width: 70px;
 			height: 70px;
 			margin: 0 auto 20px;
-			background: linear-gradient(135deg, #faab41 0, #f6821f 100%);
+			background: var(--accent-grad);
 			border-radius: 20px;
 			display: flex;
 			align-items: center;
 			justify-content: center;
-			box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+			box-shadow: var(--icon-glow);
 			animation: fadeIn .8s ease-out 1s backwards
 		}
 
@@ -185,7 +268,7 @@
 		}
 
 		.page-title {
-			font-size: 32px;
+			font-size: 28px;
 			font-weight: 700;
 			background: linear-gradient(135deg, #faab41 0, #f6821f 100%);
 			-webkit-background-clip: text;
@@ -194,6 +277,12 @@
 			margin: 0 0 12px;
 			line-height: 1.2;
 			letter-spacing: -0.5px
+		}
+
+		html.dark-mode .page-title {
+			color: var(--text-primary);
+			background: none;
+			-webkit-text-fill-color: currentColor
 		}
 
 		/* 表单样式 */
@@ -225,19 +314,29 @@
 			transition: opacity .3s ease
 		}
 
+		.input-icon svg {
+			width: 100%;
+			height: 100%;
+			fill: var(--text-primary)
+		}
+
 		.form-group input {
 			width: 100%;
-			padding: 16px;
-			border: 2px solid #e5e7eb !important;
+			padding: 16px 48px;
+			border: 2px solid var(--input-border) !important;
 			border-radius: 12px;
 			font-size: 16px;
-			color: #1f2937 !important;
-			background-color: #fff !important;
+			color: var(--text-primary) !important;
+			background-color: var(--input-bg) !important;
 			box-sizing: border-box;
 			transition: all .3s ease;
 			-webkit-appearance: none;
 			appearance: none;
 			font-family: inherit
+		}
+
+		.form-group input::placeholder {
+			color: var(--text-muted)
 		}
 
 		.form-group input.with-icon {
@@ -246,8 +345,8 @@
 
 		.form-group input:focus {
 			outline: 0 !important;
-			border-color: #faab41 !important;
-			box-shadow: 0 0 0 4px rgba(250, 171, 65, 0.1) !important
+			border-color: var(--focus) !important;
+			box-shadow: 0 0 0 4px var(--focus-ring) !important
 		}
 
 		.form-group input:focus+.input-icon {
@@ -255,15 +354,102 @@
 		}
 
 		.form-group input:disabled {
-			background-color: #f3f4f6 !important;
-			color: #9ca3af !important;
+			background-color: var(--input-bg) !important;
+			color: var(--text-muted) !important;
 			cursor: not-allowed;
 			opacity: 1
 		}
 
 		.form-group input[readonly] {
-			background-color: #f9fafb !important;
-			color: #6b7280 !important
+			background-color: var(--input-bg) !important;
+			color: var(--text-muted) !important
+		}
+
+		/* 密码可见性切换 */
+		.eye-btn {
+			position: absolute;
+			right: 8px;
+			top: 50%;
+			transform: translateY(-50%);
+			width: 36px;
+			height: 36px;
+			border: 0;
+			background: transparent;
+			border-radius: 8px;
+			color: var(--text-muted);
+			cursor: pointer;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			transition: color 0.2s ease
+		}
+
+		.eye-btn:hover {
+			color: var(--text-primary)
+		}
+
+		.eye-btn svg {
+			width: 19px;
+			height: 19px;
+			stroke: currentColor;
+			fill: none;
+			stroke-width: 2;
+			stroke-linecap: round;
+			stroke-linejoin: round
+		}
+
+		.eye-btn .i-eye-off {
+			display: none
+		}
+
+		.eye-btn.showing .i-eye {
+			display: none
+		}
+
+		.eye-btn.showing .i-eye-off {
+			display: block
+		}
+
+		/* 卡片内主题切换 FAB（与 admin 的 theme-toggle 同位） */
+		.theme-fab {
+			position: absolute;
+			top: 14px;
+			right: 14px;
+			z-index: 30;
+			width: 40px;
+			height: 40px;
+			border-radius: 50%;
+			border: 1px solid var(--border-color);
+			background: var(--bg-secondary);
+			color: var(--text-primary);
+			cursor: pointer;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+			transition: all 0.25s ease
+		}
+
+		.theme-fab:hover {
+			transform: translateY(-2px) rotate(12deg)
+		}
+
+		.theme-fab svg {
+			width: 18px;
+			height: 18px;
+			stroke: currentColor;
+			fill: none;
+			stroke-width: 2;
+			stroke-linecap: round;
+			stroke-linejoin: round
+		}
+
+		html.dark-mode .ico-sun {
+			display: none
+		}
+
+		html:not(.dark-mode) .ico-moon {
+			display: none
 		}
 
 		/* 按钮样式 */
@@ -286,7 +472,7 @@
 		.btn-primary {
 			background: linear-gradient(135deg, #faab41 0, #f6821f 100%);
 			color: #fff;
-			box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4)
+			box-shadow: 0 4px 15px rgba(246, 130, 31, 0.35)
 		}
 
 		.btn-primary::before {
@@ -306,12 +492,12 @@
 
 		.btn-primary:hover {
 			transform: translateY(-2px);
-			box-shadow: 0 6px 25px rgba(102, 126, 234, 0.5)
+			box-shadow: 0 6px 25px rgba(246, 130, 31, 0.45)
 		}
 
 		.btn-primary:active {
 			transform: translateY(0);
-			box-shadow: 0 2px 10px rgba(102, 126, 234, 0.4)
+			box-shadow: 0 2px 10px rgba(246, 130, 31, 0.35)
 		}
 
 		.btn:disabled {
@@ -324,20 +510,21 @@
 		.footer-hint {
 			margin-top: 30px;
 			font-size: 13px;
-			color: #9ca3af;
+			color: var(--text-muted);
 			animation: fadeIn 1s ease-out 1.5s backwards;
 			text-align: center
 		}
 
 		.footer-hint a {
-			color: #faab41;
+			color: var(--accent-b);
 			text-decoration: none;
 			font-weight: 500;
 			transition: color .3s ease
 		}
 
 		.footer-hint a:hover {
-			color: #f6821f
+			color: var(--accent-a);
+			text-decoration: underline
 		}
 
 		/* 模态框 */
@@ -348,7 +535,7 @@
 			left: 0;
 			width: 100%;
 			height: 100%;
-			background: rgba(0, 0, 0, 0.5);
+			background: var(--dim-bg);
 			z-index: 2000000000;
 			justify-content: center;
 			align-items: center
@@ -359,7 +546,8 @@
 		}
 
 		.modal {
-			background: #fff;
+			background: var(--bg-secondary);
+			transition: background 0.35s ease;
 			border-radius: 16px;
 			padding: 30px;
 			max-width: 400px;
@@ -424,7 +612,7 @@
 			}
 
 			.form-group input {
-				padding: 14px;
+				padding: 14px 48px;
 				font-size: 16px;
 				border-radius: 10px
 			}
@@ -478,7 +666,20 @@
 			}
 
 			.page-title {
-				font-size: 24px
+				font-size: 23px
+			}
+
+			.eye-btn {
+				right: 5px;
+				width: 34px;
+				height: 34px
+			}
+
+			.theme-fab {
+				width: 36px;
+				height: 36px;
+				top: 10px;
+				right: 10px
 			}
 		}
 
@@ -715,10 +916,43 @@
 				box-shadow: 0 8px 25px rgba(246, 130, 31, 0.5);
 			}
 		}
+
+		/* 减少动态效果偏好 */
+		@media (prefers-reduced-motion: reduce) {
+
+			*,
+			*::before,
+			*::after {
+				animation-duration: 0.01ms !important;
+				animation-iteration-count: 1 !important;
+				transition-duration: 0.01ms !important
+			}
+		}
 	</style>
 </head>
 
 <body>
+	<script>
+		// 主题初始化：与 admin 后台同源（localStorage key 'theme' + html.dark-mode 类）
+		// 首访跟随系统 prefers-color-scheme，手动切换写入 localStorage
+		(function () {
+			var stored = null;
+			try { stored = localStorage.getItem('theme'); } catch (e) { }
+			var dark = stored ? stored === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
+			document.documentElement.classList.toggle('dark-mode', dark);
+			try { localStorage.setItem('theme', dark ? 'dark' : 'light'); } catch (e) { }
+			document.addEventListener('DOMContentLoaded', function () {
+				var fab = document.getElementById('themeToggle');
+				if (!fab) return;
+				fab.addEventListener('click', function () {
+					var isDark = !document.documentElement.classList.contains('dark-mode');
+					document.documentElement.classList.toggle('dark-mode', isDark);
+					try { localStorage.setItem('theme', isDark ? 'dark' : 'light'); } catch (e) { }
+				});
+			});
+		})();
+	</script>
+
 	<!-- 背景内容 -->
 	<iframe id="background-iframe" src="/" title="背景内容"></iframe>
 
@@ -728,6 +962,10 @@
 	<!-- 登录框容器 -->
 	<div class="page-wrapper">
 		<div class="card-container">
+			<button type="button" class="theme-fab" id="themeToggle" title="切换日间/夜间模式" aria-label="切换日间/夜间模式">
+				<svg class="ico-sun" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" /></svg>
+				<svg class="ico-moon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></svg>
+			</button>
 			<div class="page-header">
 				<div class="page-icon">
 					<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -746,6 +984,10 @@
 							<path
 								d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z" />
 						</svg>
+						<button type="button" class="eye-btn" id="togglePw" title="显示/隐藏密码" aria-label="显示/隐藏密码">
+							<svg class="i-eye" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
+							<svg class="i-eye-off" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" /><line x1="1" y1="1" x2="23" y2="23" /></svg>
+						</button>
 					</div>
 				</div>
 				<button type="submit" class="btn btn-primary btn-full-width" id="loginBtn" disabled>立即登录</button>
@@ -759,9 +1001,9 @@
 
 	<!-- IR User Warning Modal -->
 	<div id="ir-modal" class="modal-overlay"
-		style="backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px); background: rgba(0,0,0,0.7);">
+		style="backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px); background: var(--dim-bg);">
 		<div class="modal"
-			style="z-index: 2147483647; max-width: 700px; padding: 0; border-radius: 32px; background: rgba(255, 255, 255, 0.95); box-shadow: 0 0 0 1px rgba(255,255,255,0.2) inset, 0 25px 50px -12px rgba(0, 0, 0, 0.8); overflow: hidden; border: none;">
+			style="z-index: 2147483647; max-width: 700px; padding: 0; border-radius: 32px; background: var(--bg-secondary); box-shadow: 0 0 0 1px rgba(255,255,255,0.2) inset, 0 25px 50px -12px rgba(0, 0, 0, 0.8); overflow: hidden; border: none;">
 			<div id="ir-modal-content"></div>
 		</div>
 	</div>
@@ -841,18 +1083,18 @@
 
 					// 按钮通用样式
 					const primaryBtnStyle = 'display: inline-block; background: linear-gradient(135deg, #faab41 0%, #f6821f 100%); color: white; text-decoration: none; padding: 16px 32px; border-radius: 14px; font-weight: 700; font-size: 17px; box-shadow: 0 8px 16px rgba(246, 130, 31, 0.2); transition: all 0.3s ease; border: none; cursor: pointer; margin: 10px; outline: none; position: relative; overflow: hidden;';
-					const secondaryBtnStyle = 'display: inline-block; background: #f9fafb; color: #9ca3af; text-decoration: none; padding: 14px 28px; border-radius: 14px; font-weight: 400; font-size: 14px; transition: all 0.3s ease; border: none; cursor: pointer; margin: 10px; outline: none;';
+					const secondaryBtnStyle = 'display: inline-block; background: var(--input-bg); color: var(--text-muted); text-decoration: none; padding: 14px 28px; border-radius: 14px; font-weight: 400; font-size: 14px; transition: all 0.3s ease; border: none; cursor: pointer; margin: 10px; outline: none;';
 
 					if (lang.toLowerCase().startsWith('zh')) {
 						// Chinese
 						contentHTML = `
-							<div style="background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%); padding: 40px 20px; text-align: center;">
-								<div style="font-size: 64px; margin-bottom: 20px; animation: shake 2s infinite;">🔒</div>
-								<h2 style="color: white; font-size: 32px; font-weight: 800; letter-spacing: -1px; margin: 0;">👋 地域访问限制</h2>
+							<div style="background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%); padding: 26px 20px; text-align: center;">
+								<div style="font-size: 44px; margin-bottom: 10px; animation: shake 2s infinite;">🔒</div>
+								<h2 style="color: white; font-size: 24px; font-weight: 800; letter-spacing: -0.5px; margin: 0;">👋 地域访问限制</h2><p style="color: rgba(255,255,255,0.85); font-size: 12.5px; margin: 6px 0 0;">此项目暂不适配当前网络环境</p>
 							</div>
-							<div style="padding: 40px; text-align: left; line-height: 1.8;">
-								<div style="background: #fdf2f2; border-left: 4px solid #dc2626; padding: 20px; border-radius: 12px; margin-bottom: 30px;">
-									<p style="font-size: 16px; color: #991b1b; margin: 0;">很遗憾，由于网络环境差异，此项目暂不适配伊朗用户的使用体验。为了给您提供更稳定、更优化的服务，我们强烈建议您使用由伊朗本地群组维护的专业项目。</p>
+							<div style="padding: 26px 24px 24px; text-align: left; line-height: 1.8;">
+								<div style="background: var(--banner-warn-bg); border-left: 4px solid var(--banner-warn-border); padding: 16px 18px; border-radius: 12px; margin-bottom: 22px;">
+									<p style="font-size: 14px; color: var(--banner-warn-text); margin: 0;">很遗憾，由于网络环境差异，此项目暂不适配伊朗用户的使用体验。为了给您提供更稳定、更优化的服务，我们强烈建议您使用由伊朗本地群组维护的专业项目。</p>
 								</div>
 								<div class="modal-button-container">
 									<button id="accept-suggestion" style="${primaryBtnStyle}">⭐ 使用 BPB-Worker-Panel</button>
@@ -863,13 +1105,13 @@
 					} else if (lang.toLowerCase().startsWith('en')) {
 						// English
 						contentHTML = `
-							<div style="background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%); padding: 40px 20px; text-align: center;">
-								<div style="font-size: 64px; margin-bottom: 20px; animation: shake 2s infinite;">🔒</div>
-								<h2 style="color: white; font-size: 32px; font-weight: 800; letter-spacing: -1px; margin: 0;">👋 Geographic Restriction</h2>
+							<div style="background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%); padding: 26px 20px; text-align: center;">
+								<div style="font-size: 44px; margin-bottom: 10px; animation: shake 2s infinite;">🔒</div>
+								<h2 style="color: white; font-size: 24px; font-weight: 800; letter-spacing: -0.5px; margin: 0;">👋 Geographic Restriction</h2><p style="color: rgba(255,255,255,0.85); font-size: 12.5px; margin: 6px 0 0;">This project is not yet adapted for your current network environment</p>
 							</div>
-							<div style="padding: 40px; text-align: left; line-height: 1.8;">
-								<div style="background: #fdf2f2; border-left: 4px solid #dc2626; padding: 20px; border-radius: 12px; margin-bottom: 30px;">
-									<p style="font-size: 16px; color: #991b1b; margin: 0;">We're unable to provide optimal service in your region. To get the best experience, we strongly recommend switching to specialized solutions maintained by the Iranian developer community.</p>
+							<div style="padding: 26px 24px 24px; text-align: left; line-height: 1.8;">
+								<div style="background: var(--banner-warn-bg); border-left: 4px solid var(--banner-warn-border); padding: 16px 18px; border-radius: 12px; margin-bottom: 22px;">
+									<p style="font-size: 14px; color: var(--banner-warn-text); margin: 0;">We're unable to provide optimal service in your region. To get the best experience, we strongly recommend switching to specialized solutions maintained by the Iranian developer community.</p>
 								</div>
 								<div class="modal-button-container">
 									<button id="accept-suggestion" style="${primaryBtnStyle}">⭐ Use BPB-Worker-Panel</button>
@@ -880,13 +1122,13 @@
 					} else {
 						// Default to Persian (IR)
 						contentHTML = `
-							<div style="background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%); padding: 40px 20px; text-align: center;">
-								<div style="font-size: 64px; margin-bottom: 20px; animation: shake 2s infinite;">🔒</div>
-								<h2 style="color: white; font-size: 32px; font-weight: 800; letter-spacing: -1px; margin: 0;">👋 دسترسی جغرافیایی محدود</h2>
+							<div style="background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%); padding: 26px 20px; text-align: center;">
+								<div style="font-size: 44px; margin-bottom: 10px; animation: shake 2s infinite;">🔒</div>
+								<h2 style="color: white; font-size: 24px; font-weight: 800; letter-spacing: -0.5px; margin: 0;">👋 دسترسی جغرافیایی محدود</h2><p style="color: rgba(255,255,255,0.85); font-size: 12.5px; margin: 6px 0 0;">این پروژه هنوز با محیط شبکه فعلی شما سازگار نیست</p>
 							</div>
-							<div style="padding: 40px; text-align: right; line-height: 1.8; direction: rtl;">
-								<div style="background: #fdf2f2; border-right: 4px solid #dc2626; padding: 20px; border-radius: 12px; margin-bottom: 30px;">
-									<p style="font-size: 16px; color: #991b1b; margin: 0;">برای خدمات بهتر، ما پروژه‌های متخصص توسعه‌یافته توسط جامعه توسعه‌دهندگان ایرانی را توصیه می‌کنیم. این راه‌حل‌ها برای محیط شبکه شما بهینه‌سازی شده‌اند.</p>
+							<div style="padding: 26px 24px 24px; text-align: right; line-height: 1.8; direction: rtl;">
+								<div style="background: var(--banner-warn-bg); border-right: 4px solid var(--banner-warn-border); padding: 16px 18px; border-radius: 12px; margin-bottom: 22px;">
+									<p style="font-size: 14px; color: var(--banner-warn-text); margin: 0;">برای خدمات بهتر، ما پروژه‌های متخصص توسعه‌یافته توسط جامعه توسعه‌دهندگان ایرانی را توصیه می‌کنیم. این راه‌حل‌ها برای محیط شبکه شما بهینه‌سازی شده‌اند.</p>
 								</div>
 								<div class="modal-button-container" style="direction: ltr;">
 									<button id="accept-suggestion" style="${primaryBtnStyle}">⭐ استفاده از BPB-Worker-Panel</button>
@@ -1010,6 +1252,20 @@
 				loginBtn.disabled = false;
 				loginBtn.classList.remove('btn-loading');
 			}
+		});
+	</script>
+	<script>
+		// 密码可见性切换（新增 UI 组件，不影响既有业务逻辑）
+		document.addEventListener('DOMContentLoaded', function () {
+			var btn = document.getElementById('togglePw');
+			var input = document.getElementById('password');
+			if (!btn || !input) return;
+			btn.addEventListener('click', function () {
+				var show = input.type === 'password';
+				input.type = show ? 'text' : 'password';
+				btn.classList.toggle('showing', show);
+				input.focus();
+			});
 		});
 	</script>
 </body>
