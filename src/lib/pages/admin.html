@@ -9903,6 +9903,119 @@
 			background: rgba(255, 255, 255, 0.075) !important;
 		}
 
+		/* ==================== 自定义优选 · 协议/备注语法高亮（方案 A · 霓虹） ==================== */
+		/* 仅作用于 #customIPs 所在编辑器（#subCustomEditor），其他 line-editor 不受影响 */
+		/* 高亮配色变量（浅色主题默认值，照抄设计稿 scheme-a） */
+		#subCustomEditor {
+			--hl-p-vless: #1a73e8;
+			--hl-p-vmess: #0891b2;
+			--hl-p-trojan: #dc2626;
+			--hl-p-ss: #8b5cf6;
+			--hl-p-ssr: #d946ef;
+			--hl-p-hysteria2: #ea580c;
+			--hl-p-hysteria: #f97316;
+			--hl-p-tuic: #10b981;
+			--hl-p-net: #4f46e5;
+			--hl-p-other: #0d9488;
+			--hl-p-comment: #d97706;
+		}
+
+		/* 高亮配色变量（深色主题覆盖） */
+		html.dark-mode #subCustomEditor {
+			--hl-p-vless: #60a5fa;
+			--hl-p-vmess: #22d3ee;
+			--hl-p-trojan: #f87171;
+			--hl-p-ss: #a78bfa;
+			--hl-p-ssr: #e879f9;
+			--hl-p-hysteria2: #fb923c;
+			--hl-p-hysteria: #fdba74;
+			--hl-p-tuic: #34d399;
+			--hl-p-net: #818cf8;
+			--hl-p-other: #2dd4bf;
+			--hl-p-comment: #fbbf24;
+		}
+
+		/* 高亮层：排版参数必须与 textarea 完全一致，保证折行/滚动绝对对齐 */
+		#subCustomEditor .line-highlight {
+			position: absolute;
+			top: 0;
+			left: 0;
+			right: 0;
+			margin: 0;
+			padding: 12px !important;
+			border: none;
+			box-sizing: border-box;
+			font-family: 'Monaco', 'Courier New', monospace !important;
+			font-size: 14px !important;
+			line-height: 24px !important;
+			color: #1f2937;
+			white-space: pre-wrap !important;
+			word-break: break-all !important;
+			overflow-wrap: anywhere;
+			pointer-events: none;
+			z-index: 0;
+			will-change: transform;
+		}
+
+		html.dark-mode #subCustomEditor .line-highlight {
+			color: var(--text-primary);
+		}
+
+		#subCustomEditor .line-highlight .hl-line {
+			min-height: 24px;
+		}
+
+		/* 高亮 token：用 -webkit-text-stroke 模拟加粗（advance width 不变，选区/折行对齐不受影响）。
+		   实测证据：中文 fallback 字体在 font-weight:700 下每字符 advance 宽 1px（15px vs 14px），
+		   一行备注累积偏移数 px，导致 textarea 选区相对 overlay 文字左偏；
+		   Courier New 拉丁 bold 与 regular 同宽不受影响，故仅中文场景偏移。
+		   text-stroke 0.6px 实测逐字符宽度偏差为 0.000px，视觉加粗强度接近 700。 */
+		#subCustomEditor .line-highlight .hl-token {
+			-webkit-text-stroke: 0.6px currentColor;
+		}
+
+		#subCustomEditor .line-highlight .hl-p-vless     { color: var(--hl-p-vless); }
+		#subCustomEditor .line-highlight .hl-p-vmess     { color: var(--hl-p-vmess); }
+		#subCustomEditor .line-highlight .hl-p-trojan    { color: var(--hl-p-trojan); }
+		#subCustomEditor .line-highlight .hl-p-ss        { color: var(--hl-p-ss); }
+		#subCustomEditor .line-highlight .hl-p-ssr       { color: var(--hl-p-ssr); }
+		#subCustomEditor .line-highlight .hl-p-hysteria2 { color: var(--hl-p-hysteria2); }
+		#subCustomEditor .line-highlight .hl-p-hysteria  { color: var(--hl-p-hysteria); }
+		#subCustomEditor .line-highlight .hl-p-tuic      { color: var(--hl-p-tuic); }
+		#subCustomEditor .line-highlight .hl-p-net       { color: var(--hl-p-net); }
+		#subCustomEditor .line-highlight .hl-p-other     { color: var(--hl-p-other); }
+		#subCustomEditor .line-highlight .hl-comment     { color: var(--hl-p-comment); }
+
+		/* 启用高亮后 textarea 正文透明化，透出高亮层颜色；保留光标与选区 */
+		#subCustomEditor textarea {
+			color: transparent !important;
+			caret-color: #2563eb;
+		}
+
+		html.dark-mode #subCustomEditor textarea {
+			caret-color: #3b82f6;
+		}
+
+		#subCustomEditor textarea::selection {
+			background: rgba(59, 130, 246, 0.25);
+			color: transparent;
+		}
+
+		html.dark-mode #subCustomEditor textarea::selection {
+			background: rgba(59, 130, 246, 0.35);
+			color: transparent;
+		}
+
+		/* 占位符不受正文透明化影响，保持可读 */
+		#subCustomEditor textarea::placeholder {
+			color: #9ca3af;
+			opacity: 1;
+		}
+
+		html.dark-mode #subCustomEditor textarea::placeholder {
+			color: #6b7280;
+		}
+
 		/* 低性能模式（自动触发）：禁用高开销视觉效果，优化无硬件加速场景 */
 		html.low-performance-mode body {
 			background: var(--admin-bg-base) !important;
@@ -10072,6 +10185,12 @@
 
 			.line-editor textarea,
 			.line-editor .wrap-measure {
+				padding: 10px !important;
+				font-size: 12px !important;
+			}
+
+			/* 小屏下高亮层与 textarea 的响应式排版参数保持一致，避免折行错位/重影 */
+			#subCustomEditor .line-highlight {
 				padding: 10px !important;
 				font-size: 12px !important;
 			}
@@ -10952,6 +11071,7 @@
 								<div class="line-shades" aria-hidden="true">
 									<div class="shade-line"></div>
 								</div>
+								<pre class="line-highlight" aria-hidden="true"></pre>
 								<textarea id="customIPs" title="自定义优选地址" wrap="soft" placeholder="www.visa.cn#优选域名
 104.24.0.232:8443#优选IPv4
 [2606:4700::]:2053#优选IPv6" onchange="markModified('sub')"></textarea>
@@ -19830,6 +19950,99 @@
 			textarea.dispatchEvent(new Event('input', { bubbles: true }));
 		}
 
+		// ==================== 自定义优选 · 协议/备注语法高亮（方案 A · 霓虹） ====================
+		// 仅针对 #customIPs 启用；不改变 textarea.value 的取值/保存逻辑
+		// 注意：辅助函数使用 CIP 专属命名，避免与页面内其他同名函数冲突
+		function escapeHtmlCIP(str) {
+			return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+		}
+
+		function protoKeyOf(name) {
+			const n = String(name).toLowerCase();
+			if (n === 'hy2') return 'hysteria2';
+			if (['vless', 'vmess', 'trojan', 'ss', 'ssr', 'hysteria2', 'hysteria', 'tuic'].indexOf(n) >= 0) return n;
+			if (['socks', 'socks5', 'socks4', 'http', 'https'].indexOf(n) >= 0) return 'net';
+			return 'other';
+		}
+
+		// 解析单行：行首 协议:// 整体为协议 token；行内第一个 # 起到行尾为备注 token
+		function highlightLine(line) {
+			const hashIdx = line.indexOf('#');
+			const body = hashIdx >= 0 ? line.slice(0, hashIdx) : line;
+			const comment = hashIdx >= 0 ? line.slice(hashIdx) : '';
+			let out = '';
+			const m = body.match(/^[A-Za-z][A-Za-z0-9+.\-]*:\/\//);
+			if (m) {
+				const key = protoKeyOf(m[0].slice(0, -3));
+				out += '<span class="hl-token hl-p-' + key + '">' + escapeHtmlCIP(m[0]) + '</span>';
+				out += escapeHtmlCIP(body.slice(m[0].length));
+			} else {
+				out += escapeHtmlCIP(body);
+			}
+			if (comment) out += '<span class="hl-token hl-comment">' + escapeHtmlCIP(comment) + '</span>';
+			return out;
+		}
+
+		function initCustomIPsHighlight() {
+			const ta = document.getElementById('customIPs');
+			if (!ta) return;
+			const container = ta.closest('.line-editor');
+			if (!container) return;
+			const hlLayer = container.querySelector('.line-highlight');
+			if (!hlLayer) return;
+
+			// 渲染高亮层（O(行数)；innerHTML 前统一 escapeHtmlCIP 转义）
+			function renderHighlight() {
+				const lines = (ta.value || '').split(/\r\n|\r|\n/);
+				let html = '';
+				for (let i = 0; i < lines.length; i++) {
+					// 空行用零宽空格保持行高，与 textarea 折行布局一致
+					const content = lines[i] === '' ? '\u200b' : highlightLine(lines[i]);
+					html += '<div class="hl-line">' + content + '</div>';
+				}
+				hlLayer.innerHTML = html;
+				syncHighlightScroll();
+			}
+
+			// 滚动同步：与 gutter pre 相同的 translate3d 机制
+			function syncHighlightScroll() {
+				hlLayer.style.transform = 'translate3d(0, ' + (-(ta.scrollTop || 0)) + 'px, 0)';
+			}
+
+			let highlightFrame = 0;
+			function scheduleHighlight() {
+				if (highlightFrame) cancelAnimationFrame(highlightFrame);
+				highlightFrame = requestAnimationFrame(() => {
+					highlightFrame = 0;
+					renderHighlight();
+				});
+			}
+
+			// 输入 → rAF 防抖渲染；滚动 → 同步位移
+			ta.addEventListener('input', scheduleHighlight);
+			ta.addEventListener('scroll', syncHighlightScroll);
+
+			// resize:vertical 拖拽 / 窗口缩放后重同步
+			if (window.ResizeObserver) {
+				new ResizeObserver(scheduleHighlight).observe(ta);
+			}
+			window.addEventListener('resize', scheduleHighlight);
+
+			// 包装 _refreshLineEditor：所有触发行编辑器刷新的调用点
+			//（含 refreshLineEditor 及直接调用 _refreshLineEditor 的位置）统一联动刷新高亮
+			if (typeof ta._refreshLineEditor === 'function') {
+				const originalRefresh = ta._refreshLineEditor;
+				ta._refreshLineEditor = function () {
+					originalRefresh();
+					scheduleHighlight();
+				};
+			}
+			ta._refreshHighlight = scheduleHighlight;
+
+			// 初始渲染
+			renderHighlight();
+		}
+
 		async function loadConfig() {
 			try {
 				// 禁用 Rocket Loader 对该请求的影响
@@ -27504,6 +27717,7 @@
 			loadConfig();
 			initUserMode();
 			initLineEditor('customIPs');
+			initCustomIPsHighlight();
 			initNodeUUIDEasterEgg();
 			initVersionCopyEasterEgg();
 			// 按协议注册表生成公开库的协议胶囊（新增协议后无需改 HTML）
