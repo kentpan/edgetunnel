@@ -9940,6 +9940,15 @@
 			position: absolute;
 			top: 0;
 			left: 0;
+			/* left:0 + right:0 只在「JS 未执行 / 该层处于 display:none」时起兜底作用，
+			   让高亮层铺满 .editor-area（此时宽度已无意义）。
+			   正常渲染由 initLineEditor() 的统一管线把 textarea 的「文本可用宽度」
+			   （clientWidth，已扣掉竖向滚动条、含内边距；textarea 为 border:none）直接写成
+			   本层的显式 width —— 高亮层铺满容器会折得比 textarea 晚，导致可视文字与真实
+			   选区/复制内容错位，所以宽度必须严格相等。
+			   注意：LTR 下绝对定位同时给出 left / width / right 属过约束，浏览器按规范忽略
+			   right，因此 JS 写入 width 后 right:0 自然失效，无需 JS 再改 right。
+			   宽度同步逻辑见 renderHighlightLayer()。 */
 			right: 0;
 			margin: 0;
 			padding: 12px !important;
@@ -19808,6 +19817,14 @@
 		}
 
 		// 初始化增强型文本编辑器
+		// 单一渲染管线：行号、斑马纹、折行测量、语法高亮层共用同一个 rAF 调度、
+		// 同一个 ResizeObserver、同一个 window resize 监听与同一个 scroll 监听；
+		// 每帧只读一次布局（clientWidth / clientHeight），高亮层内容另有独立缓存。
+		// 容器内存在 .line-highlight 即视为该编辑器启用行高亮，其单行渲染函数由
+		// LINE_RENDERERS（定义在下方「自定义优选 · 协议/备注语法高亮」块）按 textarea id 提供；
+		// 未注册但存在 .line-highlight 时回落为纯转义文本。
+		// 注册表在脚本解析阶段即初始化完毕，早于本函数的任何调用点（DOMContentLoaded / 事件回调），
+		// 故两者之间不存在调用顺序依赖。
 		function initLineEditor(textareaId) {
 			const ta = document.getElementById(textareaId);
 			if (!ta) return;
@@ -19816,16 +19833,21 @@
 			const lineNumbers = container.querySelector('.gutter pre');
 			const lineShades = container.querySelector('.line-shades');
 			if (!lineNumbers || !lineShades) return;
+			// 可选高亮层：目前仅 #customIPs 所在的 #subCustomEditor 提供 .line-highlight
+			const hlLayer = container.querySelector('.line-highlight');
+			const lineRenderer = (hlLayer && LINE_RENDERERS[textareaId]) || null;
 			const lineHeight = Number.parseFloat(getComputedStyle(ta).lineHeight) || 24;
 			const isWrapping = container.classList.contains('line-editor-wrap');
 			const editorArea = container.querySelector('.editor-area');
 			const wrapMeasure = isWrapping && editorArea ? document.createElement('div') : null;
 			let renderedLineCount = -1;
 			let renderedShadeCount = -1;
-			let renderedValue = null;
+			let renderedWrapLines = null;
 			let renderedWidth = -1;
 			let wrappedLineHeights = [];
 			let wrappedContentHeight = 0;
+			let renderedHighlightLines = null;
+			let renderedHighlightWidth = -1;
 			let renderFrame = 0;
 
 			if (wrapMeasure) {
@@ -19844,7 +19866,22 @@
 				return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 			}
 
-			function renderStraightMeta() {
+			// 按需切分文本：value 不变时复用同一个行数组实例，
+			// 于是下游可以直接用引用比较判断「内容是否变化」，无需每帧重复 split()。
+			let cachedValue = null;
+			let cachedLines = [];
+			function getLines() {
+				const value = ta.value || '';
+				if (value !== cachedValue) {
+					cachedValue = value;
+					const parts = value.split(/\r\n|\r|\n/);
+					cachedLines = parts.length ? parts : [''];
+				}
+				return cachedLines;
+			}
+
+			// 非折行模式：行号用纯文本换行，斑马纹按可见行数补齐
+			function renderStraightMeta(contentHeight) {
 				const value = ta.value || '';
 				const lineCount = countLines(value);
 				const displayLines = Math.max(1, lineCount);
@@ -19854,7 +19891,7 @@
 					lineNumbers.textContent = Array.from({ length: displayLines }, (_, index) => index + 1).join('\n');
 				}
 
-				const visibleLines = Math.ceil((ta.clientHeight || 300) / lineHeight) + 2;
+				const visibleLines = Math.ceil((contentHeight || 300) / lineHeight) + 2;
 				const shadeCount = Math.max(displayLines, visibleLines);
 				if (shadeCount !== renderedShadeCount) {
 					renderedShadeCount = shadeCount;
@@ -19862,30 +19899,28 @@
 				}
 			}
 
-			function renderWrappedMeta() {
-				if (!wrapMeasure) {
-					renderStraightMeta();
-					return;
-				}
+			// 折行模式：用离屏度量层逐行量出真实行高，行号与斑马纹都按折行后的高度铺开
+			function renderWrappedMeta(contentWidth, contentHeight) {
+				const lines = getLines();
 
-				const value = ta.value || '';
-				const width = ta.clientWidth || ta.offsetWidth || 0;
-				if (value !== renderedValue || width !== renderedWidth) {
-					const lines = value.split(/\r\n|\r|\n/);
-					const displayLines = lines.length ? lines : [''];
-					renderedValue = value;
-					renderedWidth = width;
-					renderedLineCount = displayLines.length;
+				// 兜底链与重构前严格一致：measure 层在 clientWidth 为 0 时回退到盒宽，
+				// 而高亮层（renderHighlightLayer）仍只认 clientWidth，0 时回落 CSS left:0;right:0。
+				const measureWidth = contentWidth || ta.offsetWidth || 0;
 
-					wrapMeasure.style.width = width ? `${width}px` : '100%';
-					wrapMeasure.innerHTML = displayLines.map((line) => `<div class="wrap-measure-line">${escapeHtml(line) || ' '}</div>`).join('');
+				// 仅在内容或文本可用宽度变化时重新测量折行
+				if (lines !== renderedWrapLines || measureWidth !== renderedWidth) {
+					renderedWrapLines = lines;
+					renderedWidth = measureWidth;
+
+					wrapMeasure.style.width = measureWidth ? `${measureWidth}px` : '100%';
+					wrapMeasure.innerHTML = lines.map((line) => `<div class="wrap-measure-line">${escapeHtml(line) || ' '}</div>`).join('');
 					wrappedLineHeights = Array.from(wrapMeasure.children).map((line) => Math.max(lineHeight, line.offsetHeight));
 					wrappedContentHeight = wrappedLineHeights.reduce((sum, height) => sum + height, 0);
 					lineNumbers.innerHTML = wrappedLineHeights.map((height, index) => `<span class="gutter-line" style="height:${height}px">${index + 1}</span>`).join('');
 					renderedShadeCount = -1;
 				}
 
-				const visibleHeight = Math.max(0, (ta.clientHeight || 300) - lineHeight);
+				const visibleHeight = Math.max(0, (contentHeight || 300) - lineHeight);
 				const fillerLines = Math.max(0, Math.ceil((visibleHeight - wrappedContentHeight) / lineHeight) + 1);
 				const shadeCount = wrappedLineHeights.length + fillerLines;
 				if (shadeCount !== renderedShadeCount) {
@@ -19896,12 +19931,48 @@
 				}
 			}
 
-			function renderMeta() {
-				if (isWrapping) {
-					renderWrappedMeta();
-				} else {
-					renderStraightMeta();
+			// 语法高亮层（可选）：宽度与 textarea 严格对齐，内容按 value 缓存
+			function renderHighlightLayer(contentWidth) {
+				if (!hlLayer) return;
+
+				// 宽度同步：高亮层必须与 textarea 的「文本可用宽度」严格相等。
+				// clientWidth 已扣掉竖向滚动条、且包含 textarea 内边距（textarea 为 border:none），
+				// 因此它是 wrap-measure 与高亮层唯一正确的宽度来源 —— 只测一次、只写一次。
+				// 宽度为 0（section 处于 display:none）时清空内联宽度，回落到 CSS 的 left:0;right:0，
+				// 绝不把宽度锁成 0，等元素可见后由 _refreshLineEditor() 重新同步。
+				if (contentWidth !== renderedHighlightWidth) {
+					renderedHighlightWidth = contentWidth;
+					hlLayer.style.width = contentWidth ? `${contentWidth}px` : '';
 				}
+
+				const lines = getLines();
+				// 仅内容变化时重建层内 DOM：纯高度变化（拖拽 resize、窗口缩放）不触发重渲染
+				if (lines !== renderedHighlightLines) {
+					renderedHighlightLines = lines;
+					let html = '';
+					for (let i = 0; i < lines.length; i++) {
+						// 空行用零宽空格保持行高，与 textarea 的折行布局一致
+						const content = lines[i] === '' ? '\u200b' : (lineRenderer ? lineRenderer(lines[i]) : escapeHtml(lines[i]));
+						html += '<div class="hl-line">' + content + '</div>';
+					}
+					hlLayer.innerHTML = html;
+				}
+			}
+
+			// 唯一渲染入口：一次布局读取 → 一次 pass 内写完所有层 → 一次位移同步
+			function renderMeta() {
+				// 每帧仅此一处读取布局，后续几何量全部由此推导
+				const contentWidth = ta.clientWidth || 0;
+				const contentHeight = ta.clientHeight || 0;
+
+				if (isWrapping && wrapMeasure) {
+					renderWrappedMeta(contentWidth, contentHeight);
+				} else {
+					renderStraightMeta(contentHeight);
+				}
+				renderHighlightLayer(contentWidth);
+
+				// 行号 / 斑马纹 / 高亮层在同一帧内用同一个偏移写完，不可能出现一帧错位
 				syncScroll();
 			}
 
@@ -19917,13 +19988,14 @@
 				const offset = `translate3d(0, ${-ta.scrollTop}px, 0)`;
 				lineNumbers.style.transform = offset;
 				lineShades.style.transform = offset;
+				if (hlLayer) hlLayer.style.transform = offset;
 			}
 
-			// 监听输入、滚动
+			// 输入 → rAF 防抖重排；滚动 → 三层同向同量位移（gutter / shades / 高亮层）
 			ta.addEventListener('input', scheduleRender);
 			ta.addEventListener('scroll', syncScroll);
 
-			// 监听高度变化（ResizeObserver），解决拖拽角标后的同步问题
+			// 唯一的 ResizeObserver：textarea 尺寸变化（含 resize:vertical 拖拽角标）后重新测量宽高
 			if (window.ResizeObserver) {
 				const ro = new ResizeObserver(scheduleRender);
 				ro.observe(ta);
@@ -19951,13 +20023,15 @@
 		}
 
 		// ==================== 自定义优选 · 协议/备注语法高亮（方案 A · 霓虹） ====================
-		// 仅针对 #customIPs 启用；不改变 textarea.value 的取值/保存逻辑
+		// 仅针对 #customIPs 启用；不改变 textarea.value 的取值/保存逻辑。
+		// 这里只提供「单行 -> HTML 片段」的纯函数，渲染调度统一交给 initLineEditor() 的单一渲染管线，
+		// 不再有独立的 rAF / ResizeObserver / 监听器，也不再 monkey-patch _refreshLineEditor。
 		// 注意：辅助函数使用 CIP 专属命名，避免与页面内其他同名函数冲突
 		function escapeHtmlCIP(str) {
 			return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 		}
 
-		function protoKeyOf(name) {
+		function protoKeyOfCIP(name) {
 			const n = String(name).toLowerCase();
 			if (n === 'hy2') return 'hysteria2';
 			if (['vless', 'vmess', 'trojan', 'ss', 'ssr', 'hysteria2', 'hysteria', 'tuic'].indexOf(n) >= 0) return n;
@@ -19966,14 +20040,14 @@
 		}
 
 		// 解析单行：行首 协议:// 整体为协议 token；行内第一个 # 起到行尾为备注 token
-		function highlightLine(line) {
+		function renderCustomIPsLine(line) {
 			const hashIdx = line.indexOf('#');
 			const body = hashIdx >= 0 ? line.slice(0, hashIdx) : line;
 			const comment = hashIdx >= 0 ? line.slice(hashIdx) : '';
 			let out = '';
 			const m = body.match(/^[A-Za-z][A-Za-z0-9+.\-]*:\/\//);
 			if (m) {
-				const key = protoKeyOf(m[0].slice(0, -3));
+				const key = protoKeyOfCIP(m[0].slice(0, -3));
 				out += '<span class="hl-token hl-p-' + key + '">' + escapeHtmlCIP(m[0]) + '</span>';
 				out += escapeHtmlCIP(body.slice(m[0].length));
 			} else {
@@ -19983,65 +20057,9 @@
 			return out;
 		}
 
-		function initCustomIPsHighlight() {
-			const ta = document.getElementById('customIPs');
-			if (!ta) return;
-			const container = ta.closest('.line-editor');
-			if (!container) return;
-			const hlLayer = container.querySelector('.line-highlight');
-			if (!hlLayer) return;
-
-			// 渲染高亮层（O(行数)；innerHTML 前统一 escapeHtmlCIP 转义）
-			function renderHighlight() {
-				const lines = (ta.value || '').split(/\r\n|\r|\n/);
-				let html = '';
-				for (let i = 0; i < lines.length; i++) {
-					// 空行用零宽空格保持行高，与 textarea 折行布局一致
-					const content = lines[i] === '' ? '\u200b' : highlightLine(lines[i]);
-					html += '<div class="hl-line">' + content + '</div>';
-				}
-				hlLayer.innerHTML = html;
-				syncHighlightScroll();
-			}
-
-			// 滚动同步：与 gutter pre 相同的 translate3d 机制
-			function syncHighlightScroll() {
-				hlLayer.style.transform = 'translate3d(0, ' + (-(ta.scrollTop || 0)) + 'px, 0)';
-			}
-
-			let highlightFrame = 0;
-			function scheduleHighlight() {
-				if (highlightFrame) cancelAnimationFrame(highlightFrame);
-				highlightFrame = requestAnimationFrame(() => {
-					highlightFrame = 0;
-					renderHighlight();
-				});
-			}
-
-			// 输入 → rAF 防抖渲染；滚动 → 同步位移
-			ta.addEventListener('input', scheduleHighlight);
-			ta.addEventListener('scroll', syncHighlightScroll);
-
-			// resize:vertical 拖拽 / 窗口缩放后重同步
-			if (window.ResizeObserver) {
-				new ResizeObserver(scheduleHighlight).observe(ta);
-			}
-			window.addEventListener('resize', scheduleHighlight);
-
-			// 包装 _refreshLineEditor：所有触发行编辑器刷新的调用点
-			//（含 refreshLineEditor 及直接调用 _refreshLineEditor 的位置）统一联动刷新高亮
-			if (typeof ta._refreshLineEditor === 'function') {
-				const originalRefresh = ta._refreshLineEditor;
-				ta._refreshLineEditor = function () {
-					originalRefresh();
-					scheduleHighlight();
-				};
-			}
-			ta._refreshHighlight = scheduleHighlight;
-
-			// 初始渲染
-			renderHighlight();
-		}
+		// 行渲染函数注册表：textarea id -> 单行渲染函数。
+		// 由 initLineEditor() 初始化时查询；未注册但容器内存在 .line-highlight 时回落为纯转义文本。
+		const LINE_RENDERERS = { customIPs: renderCustomIPsLine };
 
 		async function loadConfig() {
 			try {
@@ -27716,8 +27734,8 @@
 			initializePerformanceMode().catch(err => console.warn('Performance mode initialization failed:', err));
 			loadConfig();
 			initUserMode();
+			// 行编辑器（含 #customIPs 的语法高亮层）由 initLineEditor 单管线统一初始化
 			initLineEditor('customIPs');
-			initCustomIPsHighlight();
 			initNodeUUIDEasterEgg();
 			initVersionCopyEasterEgg();
 			// 按协议注册表生成公开库的协议胶囊（新增协议后无需改 HTML）
