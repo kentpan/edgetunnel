@@ -9918,6 +9918,7 @@
 			--hl-p-net: #4f46e5;
 			--hl-p-other: #0d9488;
 			--hl-p-comment: #d97706;
+			--hl-chain: #4d7c0f;
 		}
 
 		/* 高亮配色变量（深色主题覆盖） */
@@ -9933,6 +9934,7 @@
 			--hl-p-net: #818cf8;
 			--hl-p-other: #2dd4bf;
 			--hl-p-comment: #fbbf24;
+			--hl-chain: #a3e635;
 		}
 
 		/* 高亮层：排版参数必须与 textarea 完全一致，保证折行/滚动绝对对齐 */
@@ -9994,6 +9996,7 @@
 		#subCustomEditor .line-highlight .hl-p-net       { color: var(--hl-p-net); }
 		#subCustomEditor .line-highlight .hl-p-other     { color: var(--hl-p-other); }
 		#subCustomEditor .line-highlight .hl-comment     { color: var(--hl-p-comment); }
+		#subCustomEditor .line-highlight .hl-chain       { color: var(--hl-chain); }
 
 		/* 启用高亮后 textarea 正文透明化，透出高亮层颜色；保留光标与选区 */
 		#subCustomEditor textarea {
@@ -20039,7 +20042,12 @@
 			return 'other';
 		}
 
-		// 解析单行：行首 协议:// 整体为协议 token；行内第一个 # 起到行尾为备注 token
+		// 解析单行：行首 协议:// 整体为协议 token；行内第一个 # 起到行尾为备注 token。
+		// 备注内部再细分：取备注中第一个「$协议名://」作为链式起点（其前的文字仍属备注），
+		// 从该起点起到行尾单独着色为链式 token。格式为 ${节点名}$${协议}://${地址}。
+		// 判据必须落在「$ 紧跟协议名://」这个整体形态上：仅凭「$ 早于某个 ://」会把
+		// 「$50 详见 https://…」这类普通备注整段误染；也不能只取第一个 $ 再校验，
+		// 否则节点名里先出现 $（如「HK$5 链式$socks5://…」）会漏判真正的链式段。
 		function renderCustomIPsLine(line) {
 			const hashIdx = line.indexOf('#');
 			const body = hashIdx >= 0 ? line.slice(0, hashIdx) : line;
@@ -20053,7 +20061,16 @@
 			} else {
 				out += escapeHtmlCIP(body);
 			}
-			if (comment) out += '<span class="hl-token hl-comment">' + escapeHtmlCIP(comment) + '</span>';
+			if (comment) {
+				const chainMatch = comment.match(/\$[A-Za-z][A-Za-z0-9+.\-]*:\/\//);
+				if (chainMatch) {
+					const chainIdx = chainMatch.index;
+					out += '<span class="hl-token hl-comment">' + escapeHtmlCIP(comment.slice(0, chainIdx)) + '</span>';
+					out += '<span class="hl-token hl-chain">' + escapeHtmlCIP(comment.slice(chainIdx)) + '</span>';
+				} else {
+					out += '<span class="hl-token hl-comment">' + escapeHtmlCIP(comment) + '</span>';
+				}
+			}
 			return out;
 		}
 
