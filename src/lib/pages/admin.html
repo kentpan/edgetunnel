@@ -20158,7 +20158,7 @@
 				}
 			} else {
 				document.getElementById('ipMode').value = 'custom';
-				loadCustomIPs();
+				// ADD.txt 由紧随其后的 updateIPMode() 统一加载，此处不再重复调用，避免重复请求
 			}
 			updateIPMode();
 
@@ -22268,7 +22268,7 @@
 					}
 				} else {
 					document.getElementById('ipMode').value = 'custom';
-					loadCustomIPs();
+					// ADD.txt 由紧随其后的 updateIPMode() 统一加载，此处不再重复调用，避免重复请求
 				}
 				updateIPMode();
 			} else if (section === 'config') {
@@ -26999,7 +26999,7 @@
 						document.getElementById('randomCount').value = currentConfig.优选订阅生成?.本地IP库?.随机数量 || 16;
 					} else {
 						document.getElementById('ipMode').value = 'custom';
-						loadCustomIPs();
+						// ADD.txt 由紧随其后的 updateIPMode() 统一加载，此处不再重复调用，避免重复请求
 					}
 					updateIPMode();
 				} else if (section === 'config') {
