@@ -1,9 +1,12 @@
 {
-  "at": "2026-10-27T22:22:16.895Z",
+  "at": "2026-10-28T13:08:44.730Z",
   "upstream": "cmliu/edgetunnel@main",
   "workerChanged": false,
   "pagesChanged": [
-    "admin.html"
+    "login.html",
+    "admin.html",
+    "noADMIN.html",
+    "noKV.html"
   ],
   "upstreamVersion": "2026-10-08 22:23:27",
   "localVersion": "2026-10-08 22:23:27",

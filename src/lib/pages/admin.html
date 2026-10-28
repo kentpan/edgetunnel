@@ -6,15 +6,223 @@
 	<meta name="viewport" content="width=device-width,initial-scale=1">
 	<meta name="robots" content="noindex, nofollow">
 	<title>管理后台</title>
-	<script data-cfasync="false" src="https://cdn.jsdelivr.net/npm/@keeex/qrcodejs-kx@1.0.2/qrcode.min.js"></script>
+	<!-- CDN 镜像优选：jsDelivr 的默认域名在国内（尤其移动网络）常被阻断，所以不写死任何一个域名
+	     （写死只是把故障挪个地方），改为运行时并行探测：四个镜像同时探同一个 1KB 文件，谁先返回就用谁，
+	     三个资源全部从它加载。并发探测已经保证选中的是活的，因此不再保留逐级降级链。 -->
+	<script data-cfasync="false">
+		(function () {
+			'use strict';
+
+			var MIRRORS = ['https://testingcf.jsdelivr.net', 'https://gcore.jsdelivr.net', 'https://originfastly.jsdelivr.net', 'https://cdn.jsdelivr.net'];
+			var PROBE_PATH = '/npm/leaflet@1.9.4/package.json';   // 约 1KB，够小够快，且与实际资源同一个服务端
+			var PROBE_TIMEOUT_MS = 3000;
+			var ASSET_TIMEOUT_MS = 20000;                          // 仅用于兜住「一直不返回」，让 ready 有确定的结局
+			var QRCODE_PATH = '/npm/@keeex/qrcodejs-kx@1.0.2/qrcode.min.js';
+			var LEAFLET_CSS_PATH = '/npm/leaflet@1.9.4/dist/leaflet.css';
+			var LEAFLET_JS_PATH = '/npm/leaflet@1.9.4/dist/leaflet.js';
+
+			// 解析期同步抓自身当 DOM 锚点：注入的 <link> 插在它之后，就刚好排在页面自带那个巨型 <style> 前面。
+			// 页内 html.dark-mode .leaflet-popup-content-wrapper 等覆盖样式靠「后加载者胜出」压过 leaflet.css，
+			// 顺序反了会样式回归，所以不能简单 append 到 head 末尾。
+			var ANCHOR = document.currentScript || null;
+
+			var state = { qrcode: false, leaflet: false };
+			var settledCount = 0, TOTAL_TASKS = 3, resolveReady = null, reportedOnce = false;
+			var probeLog = [], mirror = null;
+			var probeDoneCount = 0, assetsDone = false;
+
+			window.__cdnLibs = { ready: new Promise(function (resolve) { resolveReady = resolve; }), mirror: null, loaded: state };
+
+			// ready 只 resolve 一次且永不 reject：调用方可以放心挂 then，不需要 catch
+			// 三个资源全部结算后顺手打一份诊断报告：此时每个资源的真实落点都已确定
+			function markSettled() {
+				settledCount = settledCount + 1;
+				if (settledCount >= TOTAL_TASKS) { assetsDone = true; resolveReady(); maybeReport(); }
+			}
+
+			// 报告要等「资源都结算完」且「探测都有结果」再打，否则慢的镜像会显示成未返回，
+			// 看上去像失败。探测本身有 3000ms 上限，所以最多多等这么久，不会挂住。
+			function maybeReport() {
+				if (!assetsDone || probeDoneCount < MIRRORS.length) return;
+				printReport();
+			}
+
+			// ===== 控制台诊断输出 =====
+			// 线上排查不必翻 Network 面板：这一条就说清了这次用的是哪个镜像、四个镜像各自多快。
+			// 任何时候想再看一遍：__cdnLibs.printReport()
+			function shortHost(base) { return base ? String(base).replace(/^https?:\/\//, '') : '—'; }
+
+			function padRight(text, width) {
+				var s = String(text);
+				while (s.length < width) s = s + ' ';
+				return s;
+			}
+
+			// 控制台是等宽字体，中文占两格：按「显示宽度」补齐，中英混排的列才真正对齐
+			function textWidth(text) {
+				var s = String(text), w = 0;
+				for (var i = 0; i < s.length; i = i + 1) {
+					w = w + (s.charCodeAt(i) > 0x2E80 ? 2 : 1);
+				}
+				return w;
+			}
+
+			function padLeft(text, width) {
+				var s = String(text);
+				while (textWidth(s) < width) s = ' ' + s;
+				return s;
+			}
+
+			function printReport() {
+				if (reportedOnce) return;
+				if (!window.console || !window.console.info) return;
+				reportedOnce = true;
+
+				// 成功的按延迟升序排前面，失败/未返回的排后面 —— 一眼就能看出这次为什么选了它
+				var list = [];
+				for (var i = 0; i < MIRRORS.length; i = i + 1) {
+					var hit = null;
+					for (var j = 0; j < probeLog.length; j = j + 1) {
+						if (probeLog[j].base === MIRRORS[i]) { hit = probeLog[j]; break; }
+					}
+					list.push({ base: MIRRORS[i], ok: !!(hit && hit.ok), ms: hit ? hit.ms : -1, seen: !!hit });
+				}
+				list.sort(function (a, b) {
+					if (a.ok !== b.ok) return a.ok ? -1 : 1;
+					if (a.ok && b.ok) return a.ms - b.ms;
+					return 0;
+				});
+
+				var lines = ['[jsDelivrCDN] 镜像优选结果 → ' + shortHost(mirror)];
+				for (var k = 0; k < list.length; k = k + 1) {
+					var item = list[k];
+					var status = item.ok ? (item.ms + 'ms') : (item.seen ? '失败/超时' : '未返回');
+					lines.push('  ' + (k + 1) + '. ' + padRight(shortHost(item.base), 27) + padLeft(status, 10) +
+						(item.base === mirror ? '   ← 使用中' : ''));
+				}
+				console.info(lines.join('\n'));
+			}
+
+			window.__cdnLibs.printReport = printReport;   // 手动复看：__cdnLibs.printReport()
+
+			// 并行竞速：4 个镜像同时探，第一个成功返回的立即胜出。不用 Promise.all —— 那等于等最慢的那个。
+			// 全部失败或超时则回调 null，退回 MIRRORS[0] 尽力而为：此时没有备选，失败即为功能降级。
+			function raceProbe(onWin) {
+				if (!window.fetch) { probeDoneCount = MIRRORS.length; onWin(null); return; }
+				var decided = false, pending = 0;
+				function win(base) { if (decided) return; decided = true; onWin(base); }
+				function lose() { pending = pending - 1; if (pending <= 0 && !decided) { decided = true; onWin(null); } }
+				for (var mi = 0; mi < MIRRORS.length; mi = mi + 1) {
+					(function (base) {
+						pending = pending + 1;
+						var probeStart = Date.now();
+						var finished = false, ctrl = null, timer = null;
+						function finish(ok) {
+							if (finished) return;
+							finished = true;
+							if (timer) { clearTimeout(timer); timer = null; }
+							// 无论胜负都记一条：报告里能看到 4 个镜像各自的真实往返耗时
+							probeLog.push({ base: base, ok: ok, ms: Date.now() - probeStart });
+							probeDoneCount = probeDoneCount + 1;
+							if (ok) win(base); else lose();
+							maybeReport();
+						}
+						try { if (typeof AbortController !== 'undefined') ctrl = new AbortController(); } catch (e0) { ctrl = null; }
+						timer = setTimeout(function () {           // 超时＝不可达，别让没响应的镜像拖住注入
+							if (ctrl) { try { ctrl.abort(); } catch (e1) { } }
+							finish(false);
+						}, PROBE_TIMEOUT_MS);
+						try {
+							// no-cors：通就算赢，不读内容，省掉预检与解析开销
+							window.fetch(base + PROBE_PATH, { mode: 'no-cors', cache: 'no-store', credentials: 'omit', signal: ctrl ? ctrl.signal : undefined })
+								.then(function () { finish(true); }, function () { finish(false); });
+						} catch (e2) { finish(false); }
+					})(MIRRORS[mi]);
+				}
+			}
+
+			// 单次加载：镜像已经由并发探测选定，这里只发一次请求，不做重试。
+			// 失败就如实降级（地图/二维码本轮不可用），不再有备选镜像可换。
+			function loadAsset(kind, path, label, flagKey) {
+				var el = document.createElement(kind === 'js' ? 'script' : 'link');
+				if (kind === 'js') {
+					el.async = false;                             // 与原有同步脚本保持一致的执行顺序
+					el.setAttribute('data-cfasync', 'false');      // 规避 Cloudflare Rocket Loader 改写
+					el.src = mirror + path;
+				} else {
+					el.rel = 'stylesheet';
+					el.href = mirror + path;
+				}
+
+				var done = false, timer = null;
+				function settle(ok) {
+					if (done) return;
+					done = true;
+					if (timer) { clearTimeout(timer); timer = null; }
+					if (ok) {
+						if (flagKey) state[flagKey] = true;
+					} else if (window.console && window.console.warn) {
+						console.warn('[jsDelivrCDN] 资源加载失败: ' + label + '（镜像 ' + mirror + '）');
+					}
+					markSettled();
+				}
+				el.onload = function () { settle(true); };
+				el.onerror = function () { settle(false); };
+				timer = setTimeout(function () { settle(false); }, ASSET_TIMEOUT_MS);
+
+				if (kind === 'js') {
+					(document.head || document.documentElement).appendChild(el);
+				} else if (ANCHOR && ANCHOR.parentNode) {
+					ANCHOR.parentNode.insertBefore(el, ANCHOR.nextSibling);   // 落在锚点之后、页面 <style> 之前
+				} else {
+					var headNode = document.head || document.documentElement;
+					headNode.insertBefore(el, headNode.getElementsByTagName('style')[0] || null);   // 兜底也守住层叠顺序
+				}
+			}
+
+			function injectAll(base) {
+				mirror = base;
+				window.__cdnLibs.mirror = base;
+				// CSS 先发起；层叠顺序由插入位置保证，与下载完成顺序无关
+				loadAsset('css', LEAFLET_CSS_PATH, 'leaflet.css', null);
+				loadAsset('js', QRCODE_PATH, 'qrcode.min.js', 'qrcode');
+				loadAsset('js', LEAFLET_JS_PATH, 'leaflet.js', 'leaflet');
+			}
+
+			function boot() {
+				raceProbe(function (winner) {
+					var chosen = winner || MIRRORS[0];
+					if (window.console && window.console.info) {
+						console.info('[jsDelivrCDN] 镜像选定 → ' + chosen + ' （' + (winner ? '并行探测胜出' : '探测无结果，退回首选') + '）');
+					}
+					injectAll(chosen);
+				});
+			}
+
+			try {
+				boot();
+			} catch (err) {
+				// 引导自身异常绝不能冒到全局（否则有白屏风险）：退回原始域名尽力而为
+				if (window.console && window.console.warn) console.warn('[jsDelivrCDN] 引导脚本异常，回退原始域名', err);
+				try {
+					injectAll(MIRRORS[MIRRORS.length - 1]);
+				} catch (e3) {
+					settledCount = TOTAL_TASKS;
+					resolveReady();   // 一个资源都没发出去，别让 ready 永远悬着
+				}
+			}
+		})();
+	</script>
 	<link rel="preconnect" href="https://fonts.googleapis.com">
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 	<link
 		href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fira+Code:wght@400;500&family=Orbitron:wght@700;800;900&display=swap"
-		rel="stylesheet">
+		rel="stylesheet" media="print" onload="this.media='all';this.onload=null">
+	<noscript>
+		<link rel="stylesheet"
+			href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fira+Code:wght@400;500&family=Orbitron:wght@700;800;900&display=swap">
+	</noscript>
 	<!-- Leaflet Map Resources -->
-	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
-	<script data-cfasync="false" src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 	<style>
 		/* 基础重置 */
 		* {
@@ -10689,9 +10897,12 @@
 				white-space: normal;
 			}
 
-			.chain-proxy-preferred-wrapper,
-			.chain-proxy-input-wrapper {
+			.chain-proxy-preferred-wrapper {
 				grid-template-columns: minmax(0, 1fr) auto minmax(64px, 0.55fr);
+			}
+
+			.chain-proxy-input-wrapper {
+				grid-template-columns: minmax(84px, 96px) auto minmax(0, 1fr);
 			}
 
 			.chain-route-node {
@@ -21541,6 +21752,12 @@
 		}
 
 		function showQRCode(elementId) {
+			// QRCode 变成异步到达：用户点得快、或全部镜像都失败时它可能缺席。
+			// 不挡一下，下面 QRCode.CorrectLevel 会抛 ReferenceError 把整个弹窗流程打断。
+			if (typeof QRCode === 'undefined') {
+				showToast('二维码组件加载失败，请检查网络后刷新重试', 'error');
+				return;
+			}
 			const text = document.getElementById(elementId).value;
 			const container = document.getElementById('qrcodeContainer');
 			container.innerHTML = '';
@@ -24646,7 +24863,13 @@
 
 		function initChainLibMap() {
 			const container = document.getElementById('proxy-map-chain');
-			if (!container || typeof L === 'undefined') return null;
+			if (!container) return null;
+			// Leaflet 由 head 阻塞脚本改成了竞速注入器异步加载，260ms 后 L 不一定已在（原来靠阻塞语义保证），
+			// 所以这里挂到 ready 上补一次。ready 只 resolve 一次，回调里再判 window.L 才递归 → 最多重入一次。
+			if (typeof L === 'undefined') {
+				if (window.__cdnLibs) window.__cdnLibs.ready.then(function () { if (window.L) initChainLibMap(); });
+				return null;   // 保留 return null：调用方以 falsy 判断是否继续建图
+			}
 			if (chainLibMapState.map) {
 				chainLibMapState.map.invalidateSize();
 				return chainLibMapState.map;
@@ -27792,16 +28015,35 @@
 		const NETWORK_BACKGROUND_IDLE_TIMEOUT_MS = 2500;
 		const NETWORK_BACKGROUND_TASK_GAP_MS = 420;
 		const NETWORK_BACKGROUND_TASK_TIMEOUT_MS = (NETWORK_API_TIMEOUT_MS * 3) + 1200;
+		const NETWORK_DOM_READY_TIMEOUT_MS = 2000;
 		let networkInfoScheduled = false;
 		let networkInfoLoadPromise = null;
 
-		function waitForPageComplete() {
-			if (document.readyState === 'complete') {
+		// 只等 DOM 解析完成（DOMContentLoaded），绝不等 window.load：
+		// Google Fonts 等第三方子资源在国内网络下会挂到 TCP 超时，
+		// 把 load 事件推迟几十秒，导致「当前网络信息」一直不开始探测。
+		function waitForDomReady(timeoutMs = NETWORK_DOM_READY_TIMEOUT_MS) {
+			if (document.readyState !== 'loading') {
 				return Promise.resolve();
 			}
 
 			return new Promise(resolve => {
-				window.addEventListener('load', resolve, { once: true });
+				let settled = false;
+				let timerId = null;
+
+				const finish = () => {
+					if (settled) return;
+					settled = true;
+					if (timerId) {
+						clearTimeout(timerId);
+					}
+					document.removeEventListener('DOMContentLoaded', finish);
+					resolve();
+				};
+
+				document.addEventListener('DOMContentLoaded', finish);
+				// 兜底：DOMContentLoaded 万一缺失，也不会让探测永远悬着
+				timerId = setTimeout(finish, timeoutMs);
 			});
 		}
 
@@ -27829,7 +28071,7 @@
 			networkInfoScheduled = true;
 
 			(async () => {
-				await waitForPageComplete();
+				await waitForDomReady();
 				if (delayMs > 0) {
 					await waitForDelay(delayMs);
 				}
@@ -28997,7 +29239,7 @@
 			return networkInfoLoadPromise;
 		}
 
-		// 页面加载完成并进入空闲状态后，在后台获取网络信息，避免影响前台初始化
+		// DOM 解析完成并进入空闲状态后，在后台获取网络信息，避免影响前台初始化（不等 window.load，防止被 Google Fonts 拖住）
 		scheduleNetworkInfoLoad();
 
 		// IP 点击查询详情功能
@@ -29374,6 +29616,9 @@
 
 				// 给 DOM 渲染留出一点点时间
 				setTimeout(() => {
+					// Leaflet 异步到达：极端情况下（镜像全挂）这里它还没加载好，跳过地图渲染即可，
+					// 不能让这个定时器里抛 ReferenceError 污染全局。
+					if (typeof L === 'undefined') return;
 					const detailMap = L.map('ip-detail-map', {
 						zoomControl: false,
 						attributionControl: false
@@ -30006,6 +30251,12 @@
 		};
 
 		function initProxyMap(type) {
+			// Leaflet 异步到达：未就绪时挂到 ready 上再试一次。ready 只 resolve 一次，
+			// 且回调里再判 window.L 才递归，故最多重入一次，不会无限递归。
+			if (typeof L === 'undefined') {
+				if (window.__cdnLibs) window.__cdnLibs.ready.then(function () { if (window.L) initProxyMap(type); });
+				return;
+			}
 			const containerId = type === 'socks5' ? 'proxy-map-socks5' : (type === 'http' ? 'proxy-map-http' : (type === 'https' ? 'proxy-map-https' : 'proxy-map-proxyip'));
 			const container = document.getElementById(containerId);
 			if (!container) return;
