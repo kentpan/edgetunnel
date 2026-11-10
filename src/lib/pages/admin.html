@@ -1798,7 +1798,6 @@
 		}
 
 		/* SOCKS5 模态框样式 */
-		#getMoreProxyIPModal .modal,
 		#exploreSocks5Modal .modal,
 		#exploreHTTPModal .modal,
 		#exploreHTTPSModal .modal {
@@ -1836,7 +1835,6 @@
 		@media (max-width: 768px) {
 
 			/* SOCKS5和HTTP弹窗的主容器样式调整 */
-			#getMoreProxyIPModal .modal,
 			#exploreSocks5Modal .modal,
 			#exploreHTTPModal .modal,
 			#exploreHTTPSModal .modal {
@@ -1940,7 +1938,6 @@
 
 		@media (max-width: 768px) {
 
-			#getMoreProxyIPModal .modal,
 			#exploreSocks5Modal .modal,
 			#exploreHTTPModal .modal,
 			#exploreHTTPSModal .modal {
@@ -3716,6 +3713,469 @@
 
 		.module .input-wrapper input {
 			flex: 1
+		}
+
+		/* PROXYIP 输入框：右侧常用域名下拉入口 */
+		.proxyip-input-box {
+			position: relative;
+			display: flex;
+			flex: 1;
+			min-width: 0;
+		}
+
+		.proxyip-input-box #proxyIP {
+			/* 右侧留给 44px 触发按钮 + 1px 分隔线 + 2px 边框内缩 */
+			padding-right: 48px;
+		}
+
+		/* 勾选「启用自动获取」时文本框只作展示，弱化成灰字 */
+		.proxyip-input-box #proxyIP.proxyip-auto-mode {
+			color: #9ca3af !important;
+		}
+
+		.proxyip-input-box #proxyIP.proxyip-auto-mode::placeholder {
+			color: #9ca3af;
+			opacity: 1;
+		}
+
+		html.dark-mode .proxyip-input-box #proxyIP.proxyip-auto-mode::placeholder {
+			color: var(--text-secondary, #9ca3af);
+		}
+
+		/* ========== PROXYIP 预设下拉（自绘面板，替代原生 select） ==========
+		   面板由 JS portal 到 document.body 下：.module 卡片的 backdrop-filter 会创建
+		   层叠上下文，面板留在卡片内时 z-index 再大也会被后续兄弟卡片盖住；
+		   面板改 position:fixed，left/top/width 由 JS 依据输入框 rect 实时计算；
+		   z-index 取 500：浮于卡片之上，远低于模态遮罩 .modal-overlay 的 2000000000 级 */
+		#proxyIPSection .proxyip-picker-trigger,
+		#echModule .proxyip-picker-trigger {
+			position: absolute;
+			top: 2px;
+			right: 2px;
+			bottom: 2px;
+			width: 44px;
+			padding: 0;
+			margin: 0;
+			border: 0;
+			border-left: 1px solid var(--input-border, #e5e7eb);
+			border-radius: 0 10px 10px 0;
+			background: transparent;
+			color: #9ca3af;
+			cursor: pointer;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			transition: color .2s ease, background .2s ease;
+		}
+
+		#proxyIPSection .proxyip-picker-trigger:hover,
+		#echModule .proxyip-picker-trigger:hover {
+			color: #b45309;
+			background: rgba(250, 171, 65, .1);
+		}
+
+		#proxyIPSection .proxyip-picker-trigger:focus-visible,
+		#echModule .proxyip-picker-trigger:focus-visible {
+			outline: 2px solid #faab41;
+			outline-offset: -2px;
+		}
+
+		#proxyIPSection .proxyip-picker-trigger .proxyip-picker-chev,
+		#echModule .proxyip-picker-trigger .proxyip-picker-chev {
+			transition: transform .2s ease;
+		}
+
+		/* 展开态：按钮琥珀底、箭头旋转、输入框获得聚焦环（与页面 input:focus 风格一致）
+		   注意带 #proxyIPSection / #echModule 前缀提权，避免被上方含 ID 的基础规则压过 */
+		#proxyIPSection .proxyip-input-box.proxyip-picker-open .proxyip-picker-trigger,
+		#echModule .ech-picker-box.proxyip-picker-open .proxyip-picker-trigger {
+			color: #b45309;
+			background: rgba(250, 171, 65, .1);
+		}
+
+		.proxyip-input-box.proxyip-picker-open .proxyip-picker-chev,
+		.ech-picker-box.proxyip-picker-open .proxyip-picker-chev {
+			transform: rotate(180deg);
+		}
+
+		.proxyip-input-box.proxyip-picker-open #proxyIP,
+		.ech-picker-box.proxyip-picker-open > input[type="text"] {
+			border-color: #faab41 !important;
+			box-shadow: 0 0 0 3px rgba(250, 171, 65, .1) !important;
+		}
+
+		/* 悬浮面板：fixed 定位，left/top/width 全部由 JS 依据 .proxyip-input-box 的
+		   getBoundingClientRect 计算——与文本框等宽等位、正下方 6px；
+		   下方空间不足且上方更大时翻转到输入框上方（.proxyip-picker-panel-flip） */
+		#proxyIPPresetPanel,
+		#echDNSPresetPanel,
+		#echSNIPresetPanel {
+			position: fixed;
+			left: 0;
+			top: 0;
+			z-index: 500;
+			width: 300px;
+			/* 移动端防横向溢出兜底（JS 已主动钳制宽度，此处双保险） */
+			max-width: calc(100vw - 16px);
+			padding: 6px;
+			background: #ffffff;
+			border: 1px solid #e5e7eb;
+			border-radius: 14px;
+			box-shadow: 0 18px 44px rgba(15, 23, 42, .16);
+			opacity: 0;
+			transform: translateY(-4px) scale(.98);
+			transform-origin: top left;
+			pointer-events: none;
+			/* 收起时同步隐藏，避免内部按钮仍可被 Tab 聚焦 */
+			visibility: hidden;
+			transition: opacity .16s cubic-bezier(.2, .8, .3, 1),
+				transform .16s cubic-bezier(.2, .8, .3, 1),
+				visibility 0s linear .16s;
+		}
+
+		/* 上翻模式：从底部原点向下展开（须写在展开态规则之前，
+		   展开态的 transform:none 才能以同级特异性后到覆盖） */
+		#proxyIPPresetPanel.proxyip-picker-panel-flip,
+		#echDNSPresetPanel.proxyip-picker-panel-flip,
+		#echSNIPresetPanel.proxyip-picker-panel-flip {
+			transform: translateY(4px) scale(.98);
+			transform-origin: bottom left;
+		}
+
+		/* 展开态：显隐 class 直接加在面板元素上——面板已 portal 到 body，
+		   不再是 .proxyip-input-box / .ech-picker-box 的后代，原「box 开合 class + 后代选择器」失效 */
+		#proxyIPPresetPanel.proxyip-picker-panel-open,
+		#echDNSPresetPanel.proxyip-picker-panel-open,
+		#echSNIPresetPanel.proxyip-picker-panel-open {
+			opacity: 1;
+			transform: none;
+			pointer-events: auto;
+			visibility: visible;
+			transition: opacity .16s cubic-bezier(.2, .8, .3, 1),
+				transform .16s cubic-bezier(.2, .8, .3, 1);
+		}
+
+		/* 滚动区：6px 细滚动条，滑块主题色随日夜切换 */
+		.proxyip-picker-scroll {
+			max-height: 336px;
+			overflow-y: auto;
+			overscroll-behavior: contain;
+			scrollbar-width: thin;
+			scrollbar-color: #d1d5db transparent;
+		}
+
+		.proxyip-picker-scroll::-webkit-scrollbar {
+			width: 6px;
+		}
+
+		.proxyip-picker-scroll::-webkit-scrollbar-track {
+			background: transparent;
+		}
+
+		.proxyip-picker-scroll::-webkit-scrollbar-thumb {
+			background: #d1d5db;
+			border-radius: 99px;
+		}
+
+		/* 分组标签：弱化灰 + 数量徽标 */
+		.proxyip-picker-group-label {
+			display: flex;
+			align-items: center;
+			gap: 7px;
+			padding: 10px 12px 5px;
+			font-size: 11px;
+			font-weight: 700;
+			letter-spacing: .08em;
+			color: #9ca3af;
+		}
+
+		.proxyip-picker-group-label.accent {
+			color: #b45309;
+		}
+
+		.proxyip-picker-count {
+			font-size: 10px;
+			font-weight: 700;
+			letter-spacing: 0;
+			padding: 1px 7px;
+			border-radius: 999px;
+			background: rgba(17, 24, 39, .05);
+			color: #9ca3af;
+		}
+
+		/* 条目：两行排版（地区名 + 等宽字体域名） */
+		.proxyip-picker-item {
+			display: flex;
+			align-items: center;
+			gap: 10px;
+			width: 100%;
+			padding: 8px 10px;
+			border: 0;
+			border-radius: 10px;
+			background: transparent;
+			cursor: pointer;
+			text-align: left;
+			font-family: inherit;
+			transition: background .13s ease;
+		}
+
+		.proxyip-picker-item:hover {
+			background: #f3f4f6;
+		}
+
+		.proxyip-picker-item:focus-visible {
+			outline: 2px solid #faab41;
+			outline-offset: -2px;
+		}
+
+		/* 推荐条目：琥珀弱底常驻，不加胶囊徽章 */
+		.proxyip-picker-item.recommended {
+			background: rgba(250, 171, 65, .12);
+		}
+
+		.proxyip-picker-item.recommended:hover {
+			background: rgba(250, 171, 65, .12);
+			filter: brightness(1.06);
+		}
+
+		.proxyip-picker-flag {
+			font-size: 16px;
+			line-height: 1;
+			flex-shrink: 0;
+		}
+
+		.proxyip-picker-body {
+			flex: 1;
+			min-width: 0;
+			display: flex;
+			flex-direction: column;
+			gap: 2px;
+		}
+
+		.proxyip-picker-name {
+			display: flex;
+			align-items: center;
+			gap: 7px;
+			font-size: 13px;
+			font-weight: 600;
+			line-height: 1.35;
+			color: #1f2937;
+		}
+
+		.proxyip-picker-item.recommended .proxyip-picker-name {
+			color: #b45309;
+		}
+
+		.proxyip-picker-domain {
+			font-family: "SF Mono", "Cascadia Mono", Consolas, monospace;
+			font-size: 11.5px;
+			color: #6b7280;
+			letter-spacing: -.01em;
+			white-space: nowrap;
+			overflow: hidden;
+			text-overflow: ellipsis;
+		}
+
+		/* 选中对勾：默认隐藏，is-selected 时显示 */
+		.proxyip-picker-check {
+			color: #b45309;
+			flex-shrink: 0;
+			visibility: hidden;
+		}
+
+		.proxyip-picker-item.is-selected .proxyip-picker-check {
+			visibility: visible;
+		}
+
+		/* ---------- 宽面板单行排版：输入框宽度 ≥ 420px 时由 JS 加 .proxyip-picker-wide ----------
+		   地区名靠左、域名 margin-left:auto 靠右、对勾与域名同排；
+		   窄面板（移动端/勾选自动获取挤压时）不加此 class，保持上方两行排版不变 */
+		#proxyIPPresetPanel.proxyip-picker-wide .proxyip-picker-item,
+		#echDNSPresetPanel.proxyip-picker-wide .proxyip-picker-item,
+		#echSNIPresetPanel.proxyip-picker-wide .proxyip-picker-item {
+			padding: 9px 12px;
+		}
+
+		/* pbody 由纵向列改为横向行：地区名 nowrap 靠左，域名靠右，垂直居成一行 */
+		#proxyIPPresetPanel.proxyip-picker-wide .proxyip-picker-body,
+		#echDNSPresetPanel.proxyip-picker-wide .proxyip-picker-body,
+		#echSNIPresetPanel.proxyip-picker-wide .proxyip-picker-body {
+			flex-direction: row;
+			align-items: center;
+		}
+
+		#proxyIPPresetPanel.proxyip-picker-wide .proxyip-picker-name,
+		#echDNSPresetPanel.proxyip-picker-wide .proxyip-picker-name,
+		#echSNIPresetPanel.proxyip-picker-wide .proxyip-picker-name {
+			white-space: nowrap;
+			flex-shrink: 0;
+		}
+
+		#proxyIPPresetPanel.proxyip-picker-wide .proxyip-picker-domain,
+		#echDNSPresetPanel.proxyip-picker-wide .proxyip-picker-domain,
+		#echSNIPresetPanel.proxyip-picker-wide .proxyip-picker-domain {
+			margin-left: auto;
+			min-width: 0;
+		}
+
+		/* 对勾与域名同排放最右：item 自身 gap 为 10px，减 4px 使对勾与域名间距为 6px */
+		#proxyIPPresetPanel.proxyip-picker-wide .proxyip-picker-check,
+		#echDNSPresetPanel.proxyip-picker-wide .proxyip-picker-check,
+		#echSNIPresetPanel.proxyip-picker-wide .proxyip-picker-check {
+			margin-left: -4px;
+		}
+
+		/* 面板底注：常驻提示，不随滚动区滚动 */
+		.proxyip-picker-foot {
+			margin: 6px -6px -6px;
+			padding: 9px 14px;
+			border-top: 1px solid #e5e7eb;
+			border-radius: 0 0 14px 14px;
+			font-size: 11px;
+			color: #9ca3af;
+		}
+
+		/* 选中反馈：输入框文字短暂染上琥珀色（JS 加/移除 .proxyip-picker-flash） */
+		.proxyip-input-box #proxyIP.proxyip-picker-flash {
+			color: #b45309 !important;
+		}
+
+		/* ---------- 夜间模式（html.dark-mode）覆盖 ---------- */
+		html.dark-mode #proxyIPSection .proxyip-picker-trigger,
+		html.dark-mode #echModule .proxyip-picker-trigger {
+			color: #6b7280;
+		}
+
+		html.dark-mode #proxyIPSection .proxyip-picker-trigger:hover,
+		html.dark-mode #echModule .proxyip-picker-trigger:hover {
+			color: #faab41;
+			background: rgba(250, 171, 65, .15);
+		}
+
+		html.dark-mode #proxyIPSection .proxyip-input-box.proxyip-picker-open .proxyip-picker-trigger,
+		html.dark-mode #echModule .ech-picker-box.proxyip-picker-open .proxyip-picker-trigger {
+			color: #faab41;
+			background: rgba(250, 171, 65, .15);
+		}
+
+		html.dark-mode .proxyip-input-box.proxyip-picker-open #proxyIP,
+		html.dark-mode .ech-picker-box.proxyip-picker-open > input[type="text"] {
+			box-shadow: 0 0 0 3px rgba(250, 171, 65, .15) !important;
+		}
+
+		html.dark-mode #proxyIPPresetPanel,
+		html.dark-mode #echDNSPresetPanel,
+		html.dark-mode #echSNIPresetPanel {
+			background: #212327;
+			border-color: #3a3d42;
+			box-shadow: 0 18px 44px rgba(0, 0, 0, .55);
+		}
+
+		html.dark-mode .proxyip-picker-scroll {
+			scrollbar-color: #46484d transparent;
+		}
+
+		html.dark-mode .proxyip-picker-scroll::-webkit-scrollbar-thumb {
+			background: #46484d;
+		}
+
+		html.dark-mode .proxyip-picker-group-label {
+			color: #7d838c;
+		}
+
+		html.dark-mode .proxyip-picker-group-label.accent {
+			color: #faab41;
+		}
+
+		html.dark-mode .proxyip-picker-count {
+			background: rgba(255, 255, 255, .07);
+			color: #7d838c;
+		}
+
+		html.dark-mode .proxyip-picker-item:hover {
+			background: #2e2e2e;
+		}
+
+		html.dark-mode .proxyip-picker-item.recommended,
+		html.dark-mode .proxyip-picker-item.recommended:hover {
+			background: rgba(250, 171, 65, .15);
+		}
+
+		html.dark-mode .proxyip-picker-name {
+			color: #e5e5e5;
+		}
+
+		html.dark-mode .proxyip-picker-item.recommended .proxyip-picker-name {
+			color: #faab41;
+		}
+
+		html.dark-mode .proxyip-picker-domain {
+			color: #a0a0a0;
+		}
+
+		html.dark-mode .proxyip-picker-check {
+			color: #faab41;
+		}
+
+		html.dark-mode .proxyip-picker-foot {
+			border-top-color: #3a3d42;
+			color: #7d838c;
+		}
+
+		html.dark-mode .proxyip-input-box #proxyIP.proxyip-picker-flash {
+			color: #faab41 !important;
+		}
+
+		/* ========== ECH 预设下拉：完全复用上方 .proxyip-picker-* 视觉 ==========
+		   两个 ECH form-group 是 display:grid（200px 1fr），.ech-picker-box 直接作网格项；
+		   右侧留给 44px 触发按钮的留白必须用 ID 提权——移动端媒体查询里的
+		   .module .form-group input 会覆盖普通类的 padding（PROXYIP 靠 #proxyIP 的 ID 压过去） */
+		.ech-picker-box {
+			position: relative;
+			display: flex;
+			flex: 1;
+			min-width: 0;
+		}
+
+		.ech-picker-box > input[type="text"] {
+			flex: 1;
+			min-width: 0;
+		}
+
+		#echDNSGroup .ech-picker-box > input[type="text"],
+		#echSNIGroup .ech-picker-box > input[type="text"] {
+			/* 右侧留给 44px 触发按钮 + 1px 分隔线 + 2px 边框内缩 */
+			padding-right: 48px;
+		}
+
+		/* 「自动获取」态：文本框只作展示，占位提示弱化成灰字 */
+		.ech-picker-box > input[type="text"].ech-auto-mode::placeholder {
+			color: #9ca3af;
+			opacity: 1;
+		}
+
+		html.dark-mode .ech-picker-box > input[type="text"].ech-auto-mode::placeholder {
+			color: var(--text-secondary, #9ca3af);
+		}
+
+		/* 选中反馈：输入框文字短暂染上琥珀色（JS 加/移除 .ech-picker-flash） */
+		.ech-picker-box > input[type="text"].ech-picker-flash {
+			color: #b45309 !important;
+		}
+
+		html.dark-mode .ech-picker-box > input[type="text"].ech-picker-flash {
+			color: #faab41 !important;
+		}
+
+		/* 说明行（如 SNI「自动获取」的用途说明）：不用等宽字体、正常字距、弱化灰 */
+		.proxyip-picker-domain.is-note {
+			font-family: inherit;
+			letter-spacing: 0;
+			color: #9ca3af;
+		}
+
+		html.dark-mode .proxyip-picker-domain.is-note {
+			color: #7d838c;
 		}
 
 		.grpc-ua-wrapper {
@@ -10607,7 +11067,6 @@
 				font-size: 20px;
 			}
 
-			#getMoreProxyIPModal .modal,
 			#exploreSocks5Modal .modal,
 			#exploreHTTPModal .modal,
 			#exploreHTTPSModal .modal {
@@ -10997,6 +11456,310 @@
 			.network-cards-container,
 			.latency-cards {
 				grid-template-columns: repeat(2, minmax(0, 1fr));
+			}
+		}
+
+		/* ===== 连接复用（XHTTP xmux 参数） ===== */
+		/* 复用模块原生 .form-group 网格（200px 标签列 + 1fr 内容列），让「启用」左沿与上下输入框对齐 */
+		.xmux-row-label {
+			white-space: nowrap;
+		}
+
+		.xmux-row-body {
+			align-items: center;
+			display: flex;
+			gap: 20px;
+			justify-content: space-between;
+			min-width: 0;
+		}
+
+		.xmux-row-body .checkbox-group {
+			align-items: center;
+			display: flex;
+			gap: 10px;
+			margin: 0;
+			white-space: nowrap;
+		}
+
+		.xmux-controls {
+			align-items: center;
+			display: flex;
+			flex-shrink: 0;
+			gap: 15px;
+			margin-left: auto;
+		}
+
+		.xmux-controls .btn {
+			flex-shrink: 0;
+			font-size: 14px;
+		}
+
+		/* 与「参数配置」同款的紫色主操作按钮 */
+		.btn-xmux-detail {
+			background: linear-gradient(135deg, #8b5cf6 0, #7c3aed 100%);
+			color: #fff;
+			box-shadow: 0 4px 15px rgba(139, 92, 246, .3);
+		}
+
+		.btn-xmux-detail::before {
+			content: '';
+			position: absolute;
+			top: 0;
+			left: -100%;
+			width: 100%;
+			height: 100%;
+			background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .3), transparent);
+			transition: left .5s ease;
+		}
+
+		.btn-xmux-detail:hover::before {
+			left: 100%;
+		}
+
+		.btn-xmux-detail:hover {
+			transform: translateY(-2px);
+			box-shadow: 0 6px 25px rgba(139, 92, 246, .5);
+		}
+
+		.btn-xmux-detail:active {
+			transform: translateY(0);
+			box-shadow: 0 2px 10px rgba(139, 92, 246, .3);
+		}
+
+		.xmux-modal {
+			--xmux-accent: #f6821f;
+			--xmux-accent-soft: rgba(246, 130, 31, 0.28);
+			--xmux-line: #e5e7eb;
+			--xmux-surface: #f8fafc;
+			--xmux-surface-raised: #ffffff;
+			--xmux-ink: #111827;
+			--xmux-ink-soft: #4b5563;
+			--xmux-ink-muted: #6b7280;
+			--xmux-warn-bg: #fffbeb;
+			--xmux-warn-line: #fbbf24;
+			--xmux-warn-ink: #92400e;
+			max-width: min(760px, calc(100vw - 24px));
+			width: min(720px, 95vw);
+			max-height: calc(100vh - 40px);
+			overflow-y: auto;
+			text-align: left;
+		}
+
+		html.dark-mode .xmux-modal {
+			--xmux-line: #34343a;
+			--xmux-surface: #1f1f23;
+			--xmux-surface-raised: #2a2a30;
+			--xmux-ink: #f4f4f5;
+			--xmux-ink-soft: #d4d4d8;
+			--xmux-ink-muted: #a1a1aa;
+			--xmux-warn-bg: #2c2213;
+			--xmux-warn-line: #7c5416;
+			--xmux-warn-ink: #fbbf24;
+		}
+
+		.xmux-modal-title {
+			margin: 0 0 6px;
+			color: var(--xmux-ink);
+			font-size: 19px;
+			font-weight: 700;
+		}
+
+		.xmux-modal-subtitle {
+			margin: 0 0 14px;
+			color: var(--xmux-ink-muted);
+			font-size: 12.5px;
+			line-height: 1.6;
+		}
+
+		.xmux-intro {
+			margin: 0 0 16px;
+			padding: 10px 12px;
+			border: 1px solid var(--xmux-warn-line);
+			border-radius: 10px;
+			background: var(--xmux-warn-bg);
+			color: var(--xmux-warn-ink);
+			font-size: 12px;
+			line-height: 1.7;
+		}
+
+		.xmux-intro a {
+			color: inherit;
+			font-weight: 600;
+			text-decoration: underline;
+			text-underline-offset: 2px;
+		}
+
+		.xmux-intro a:hover {
+			opacity: .78;
+		}
+
+		.xmux-intro strong {
+			font-weight: 700;
+		}
+
+		.xmux-grid {
+			display: grid;
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+			gap: 12px;
+		}
+
+		.xmux-field {
+			display: flex;
+			flex-direction: column;
+			gap: 8px;
+			padding: 12px 14px;
+			border: 1px solid var(--xmux-line);
+			border-radius: 12px;
+			background: var(--xmux-surface);
+			transition: border-color 0.2s ease, box-shadow 0.2s ease;
+		}
+
+		.xmux-field-head {
+			align-items: center;
+			display: flex;
+			flex-wrap: wrap;
+			gap: 8px;
+		}
+
+		.xmux-field-name {
+			color: var(--xmux-ink);
+			font-size: 13.5px;
+			font-weight: 700;
+			letter-spacing: .2px;
+		}
+
+		.xmux-field-key {
+			padding: 2px 7px;
+			border: 1px solid var(--xmux-line);
+			border-radius: 999px;
+			background: var(--xmux-surface-raised);
+			color: var(--xmux-ink-muted);
+			font-family: 'Fira Code', 'Monaco', monospace;
+			font-size: 10.5px;
+			font-weight: 600;
+			letter-spacing: 0;
+			white-space: nowrap;
+		}
+
+		.xmux-field input {
+			width: 100%;
+			padding: 9px 11px;
+			border: 1px solid var(--xmux-line);
+			border-radius: 8px;
+			background: var(--xmux-surface-raised);
+			color: var(--xmux-ink);
+			font-family: inherit;
+			font-size: 14px;
+			font-weight: 600;
+			box-sizing: border-box;
+			transition: border-color 0.2s ease, box-shadow 0.2s ease;
+		}
+
+		.xmux-field input:focus {
+			outline: 0;
+			border-color: var(--xmux-accent);
+			box-shadow: 0 0 0 3px rgba(250, 171, 65, 0.16);
+		}
+
+		.xmux-field input:disabled {
+			cursor: not-allowed;
+			opacity: 0.6;
+		}
+
+		.xmux-field-desc {
+			margin: 0;
+			color: var(--xmux-ink-muted);
+			font-size: 12px;
+			line-height: 1.55;
+		}
+
+		.xmux-field-error {
+			display: none;
+			margin: 0;
+			color: #dc2626;
+			font-size: 11.5px;
+			line-height: 1.5;
+		}
+
+		.xmux-field.is-invalid .xmux-field-error {
+			display: block;
+		}
+
+		.xmux-field.is-invalid input {
+			border-color: #ef4444;
+			box-shadow: 0 0 0 3px rgba(239, 68, 68, .14);
+		}
+
+		html.dark-mode .xmux-field-error {
+			color: #f87171;
+		}
+
+		.xmux-field.is-conflict {
+			border-color: var(--xmux-accent);
+			animation: xmuxConflictFlash 0.9s ease-out;
+		}
+
+		@keyframes xmuxConflictFlash {
+			0% {
+				box-shadow: 0 0 0 0 rgba(246, 130, 31, 0.65);
+			}
+
+			45% {
+				box-shadow: 0 0 0 4px var(--xmux-accent-soft);
+			}
+
+			100% {
+				box-shadow: 0 0 0 0 rgba(246, 130, 31, 0);
+			}
+		}
+
+		.xmux-buttons {
+			display: flex;
+			align-items: center;
+			gap: 10px;
+			justify-content: space-between;
+			margin-top: 20px;
+		}
+
+		.xmux-buttons .btn {
+			flex: 0 0 auto;
+			min-height: 38px;
+			padding: 0 16px;
+			font-size: 13.5px;
+			line-height: 1;
+		}
+
+		.xmux-btn-group {
+			display: flex;
+			gap: 10px;
+			margin-left: auto;
+		}
+
+		@media (max-width: 640px) {
+			.xmux-grid {
+				grid-template-columns: minmax(0, 1fr);
+			}
+
+			.xmux-modal {
+				padding: 22px 16px;
+			}
+
+			.xmux-buttons {
+				align-items: stretch;
+				flex-direction: column;
+			}
+
+			.xmux-buttons .btn {
+				width: 100%;
+			}
+
+			.xmux-btn-group {
+				margin-left: 0;
+			}
+
+			.xmux-btn-group .btn {
+				flex: 1;
+				width: auto;
 			}
 		}
 	</style>
@@ -11405,6 +12168,23 @@
 							</select>
 						</div>
 
+						<div class="form-group xmux-row" id="xmuxRow" style="display: none;">
+							<label class="xmux-row-label" for="xmuxEnabled">连接复用</label>
+							<div class="xmux-row-body">
+								<div class="checkbox-group">
+									<input type="checkbox" id="xmuxEnabled"
+										title="XHTTP 传输协议下复用 HTTP 连接，减少连接建立与握手开销"
+										onchange="handleXmuxEnabledChange(event)">
+									<label for="xmuxEnabled" class="checkbox-label"
+										title="XHTTP 传输协议下复用 HTTP 连接，减少连接建立与握手开销">启用</label>
+								</div>
+								<div class="xmux-controls">
+									<button type="button" class="btn btn-xmux-detail xmux-detail-btn" id="xmuxDetailBtn"
+										onclick="openXmuxModal()">⚙️ 参数配置</button>
+								</div>
+							</div>
+						</div>
+
 						<div class="form-group mobile-half" id="grpcModeGroup" style="display: none;">
 							<label for="grpcMode">gRPC模式</label>
 							<select id="grpcMode" title="gRPC模式" onchange="markModified('config')">
@@ -11426,6 +12206,22 @@
 							</div>
 						</div>
 
+						<div class="form-group mobile-half" id="alpnGroup" style="display: none;">
+							<label for="alpn"
+								title="ALPN（Application-Layer Protocol Negotiation）应用层协议协商。&#10;默认「客户端自动协商」由客户端自行决定协议，兼容性最佳。&#10;手动指定后节点将固定使用所选协议集，若与客户端或网络环境不兼容，最坏情况会导致节点无法连接。">ALPN</label>
+							<select id="alpn"
+								title="ALPN（Application-Layer Protocol Negotiation）应用层协议协商。&#10;默认「客户端自动协商」由客户端自行决定协议，兼容性最佳。&#10;手动指定后节点将固定使用所选协议集，若与客户端或网络环境不兼容，最坏情况会导致节点无法连接。"
+								onchange="handleALPNChange(event)">
+								<option value="">客户端自动协商</option>
+								<option value="h3">h3</option>
+								<option value="h2">h2</option>
+								<option value="http/1.1">http/1.1</option>
+								<option value="h3,h2">h3,h2</option>
+								<option value="h2,http/1.1">h2,http/1.1</option>
+								<option value="h3,h2,http/1.1">h3,h2,http/1.1</option>
+							</select>
+						</div>
+
 						<div class="form-group mobile-half" id="fingerprintGroup">
 							<label for="fingerprint">指纹伪装</label>
 							<select id="fingerprint" title="浏览器指纹"
@@ -11440,22 +12236,6 @@
 								<option value="qq">qq</option>
 								<option value="random">random</option>
 								<option value="randomized">randomized</option>
-							</select>
-						</div>
-
-						<div class="form-group mobile-half" id="alpnGroup" style="display: none;">
-							<label for="alpn"
-								title="ALPN（Application-Layer Protocol Negotiation）应用层协议协商。&#10;默认「客户端自动协商」由客户端自行决定协议，兼容性最佳。&#10;手动指定后节点将固定使用所选协议集，若与客户端或网络环境不兼容，最坏情况会导致节点无法连接。">ALPN</label>
-							<select id="alpn"
-								title="ALPN（Application-Layer Protocol Negotiation）应用层协议协商。&#10;默认「客户端自动协商」由客户端自行决定协议，兼容性最佳。&#10;手动指定后节点将固定使用所选协议集，若与客户端或网络环境不兼容，最坏情况会导致节点无法连接。"
-								onchange="handleALPNChange(event)">
-								<option value="">客户端自动协商</option>
-								<option value="h3">h3</option>
-								<option value="h2">h2</option>
-								<option value="http/1.1">http/1.1</option>
-								<option value="h3,h2">h3,h2</option>
-								<option value="h2,http/1.1">h2,http/1.1</option>
-								<option value="h3,h2,http/1.1">h3,h2,http/1.1</option>
 							</select>
 						</div>
 					</div>
@@ -11552,65 +12332,45 @@
 
 					<div class="form-group" id="echDNSGroup" title="用于获取 EchConfig 的DNS服务"
 						style="display: none; align-items: start;">
-						<label for="echDNSSelect" style="padding-top: 10px;">EchConfig DNS服务</label>
-						<div class="input-wrapper" style="flex-direction: column; align-items: stretch;">
-							<select id="echDNSSelect" style="display: none;" onchange="onEchDNSSelectChange()">
-								<option value="udp://208.67.220.220:443" data-region="international">
-									udp://208.67.220.220:443（OpenDNS）</option>
-								<option value="udp://149.112.112.112:9953" data-region="international">
-									udp://149.112.112.112:9953（Quad9）</option>
-								<option value="udp://45.90.28.0:5353" data-region="international">
-									udp://45.90.28.0:5353（NextDNS）</option>
-								<option value="udp://188.166.206.224:5003" data-region="international">
-									udp://188.166.206.224:5003（Tiarap）</option>
-								<option value="https://doh.applied-privacy.net/query" data-region="international">
-									https://doh.applied-privacy.net/query（Applied Privacy DoH）</option>
-								<option value="https://odvr.nic.cz/doh" data-region="international">
-									https://odvr.nic.cz/doh（CZ.NIC DoH）</option>
-								<option value="https://dns.alidns.com/dns-query" data-region="domestic">
-									https://dns.alidns.com/dns-query（阿里 DoH：国内DNS需搭配设置ECH解析域名，是否可用需自行验证）小白推荐选这个！！！
-								</option>
-								<option value="https://sm2.doh.pub/dns-query" data-region="domestic">
-									https://sm2.doh.pub/dns-query（腾讯国密 DoH：国内DNS需搭配设置ECH解析域名，是否可用需自行验证）</option>
-								<option value="https://doh.360.cn/dns-query" data-region="domestic">
-									https://doh.360.cn/dns-query（360 DoH：国内DNS需搭配设置ECH解析域名，是否可用需自行验证）</option>
-								<option value="https://doh.onedns.net/dns-query" data-region="domestic">
-									https://doh.onedns.net/dns-query（OneDNS DoH：国内DNS需搭配设置ECH解析域名，是否可用需自行验证）</option>
-								<option value="custom">自定义</option>
-							</select>
-							<input type="text" id="echDNSCustomInput" title="自定义ECH DNS服务"
-								placeholder="udp://... 或 https://..." onchange="onEchDNSCustomInput()"
-								style="display: none; margin-top: 8px;">
-							<input type="hidden" id="echDNSValue">
+						<label for="echDNSInput" style="padding-top: 10px;">EchConfig DNS服务</label>
+						<div class="ech-picker-box">
+							<input type="text" id="echDNSInput" title="EchConfig DNS服务"
+								placeholder="udp://... 或 https://..." autocomplete="off" spellcheck="false"
+								oninput="onEchDNSInput()" onchange="onEchDNSInput()">
+							<button type="button" class="proxyip-picker-trigger" id="echDNSPresetTrigger"
+								aria-haspopup="listbox" aria-expanded="false" aria-controls="echDNSPresetPanel"
+								title="从常用 DNS 服务中选择">
+								<svg class="proxyip-picker-chev" width="16" height="16" viewBox="0 0 24 24" fill="none"
+									stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+									<polyline points="6 9 12 15 18 9" />
+								</svg>
+							</button>
+							<div class="proxyip-picker-panel" id="echDNSPresetPanel" role="listbox"
+								aria-label="选择 EchConfig DNS 服务"></div>
 						</div>
+						<input type="hidden" id="echDNSValue">
 					</div>
 
 					<div class="form-group" id="echSNIGroup"
 						title="用于解析 EchConfig 的域名，并非ECH伪装域名！CF ECH伪装域名均为 cloudflare-ech.com ！！！"
 						style="display: none; align-items: start;">
-						<label for="echSNISelect" style="padding-top: 10px;">EchConfig 解析域名</label>
-						<div class="input-wrapper" style="flex-direction: column; align-items: stretch;">
-							<select id="echSNISelect" style="display: none;" onchange="onEchSNISelectChange()">
-								<option value="__AUTO__">自动获取（使用节点的伪装域名解析 EchConfig）</option>
-								<option value="cloudflare-ech.com">cloudflare-ech.com（Cloudflare ECH域名）小白推荐选这个！！！
-								</option>
-								<option value="crypto.cloudflare.com">crypto.cloudflare.com（Cloudflare密码学服务）</option>
-								<option value="encryptedsni.com">encryptedsni.com（Cloudflare加密SNI）</option>
-								<option value="icook.hk">icook.hk（愛料理 HK）</option>
-								<option value="cm.edu.kg">cm.edu.kg（CM科技大学）</option>
-								<option value="godotengine.org">godotengine.org（Godot 开源游戏引擎）</option>
-								<option value="www.britannica.com">www.britannica.com（大英百科全书）</option>
-								<option value="www.prometheus.io">www.prometheus.io（Prometheus 监控系统）</option>
-								<option value="www.kyocera.com">www.kyocera.com（Kyocera 集团官网）</option>
-								<option value="celestia.org">celestia.org（Celestia 模块化区块链）</option>
-								<option value="lido.fi">lido.fi（Lido 流动质押）</option>
-								<option value="custom">自定义</option>
-							</select>
-							<input type="text" id="echSNICustomInput" title="自定义ECH 解析域名"
-								placeholder="cloudflare-ech.com" onchange="onEchSNICustomInput()"
-								style="display: none; margin-top: 8px;">
-							<input type="hidden" id="echSNIValue">
+						<label for="echSNIInput" style="padding-top: 10px;">EchConfig 解析域名</label>
+						<div class="ech-picker-box">
+							<input type="text" id="echSNIInput" class="ech-auto-mode" title="EchConfig 解析域名"
+								placeholder="自动获取（使用节点的伪装域名解析 EchConfig）" autocomplete="off"
+								spellcheck="false" oninput="onEchSNIInput()" onchange="onEchSNIChange()">
+							<button type="button" class="proxyip-picker-trigger" id="echSNIPresetTrigger"
+								aria-haspopup="listbox" aria-expanded="false" aria-controls="echSNIPresetPanel"
+								title="从常用 ECH 解析域名中选择">
+								<svg class="proxyip-picker-chev" width="16" height="16" viewBox="0 0 24 24" fill="none"
+									stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+									<polyline points="6 9 12 15 18 9" />
+								</svg>
+							</button>
+							<div class="proxyip-picker-panel" id="echSNIPresetPanel" role="listbox"
+								aria-label="选择 EchConfig 解析域名"></div>
 						</div>
+						<input type="hidden" id="echSNIValue">
 					</div>
 
 					<div class="module-footer">
@@ -11650,8 +12410,271 @@
 						<div class="form-group">
 							<label for="proxyIP">PROXYIP</label>
 							<div class="input-wrapper">
-								<input type="text" id="proxyIP" title="PROXYIP" placeholder="proxyip.cmliussss.net"
-									onchange="processProxyIP()" oninput="processProxyIP()">
+								<div class="proxyip-input-box">
+									<input type="text" id="proxyIP" title="PROXYIP" placeholder="proxyip.cmliussss.net"
+										autocomplete="off" spellcheck="false" onchange="processProxyIP()"
+										oninput="processProxyIP()">
+								<button type="button" class="proxyip-picker-trigger" id="proxyIPPresetTrigger"
+									aria-haspopup="listbox" aria-expanded="false" aria-controls="proxyIPPresetPanel"
+									title="从常用 PROXYIP 域名中选择">
+										<svg class="proxyip-picker-chev" width="16" height="16" viewBox="0 0 24 24" fill="none"
+											stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+											<polyline points="6 9 12 15 18 9" />
+										</svg>
+									</button>
+									<div class="proxyip-picker-panel" id="proxyIPPresetPanel" role="listbox"
+										aria-label="选择 PROXYIP 预设">
+										<div class="proxyip-picker-scroll">
+											<div class="proxyip-picker-group">
+												<div class="proxyip-picker-group-label accent">✨ 推荐</div>
+												<button type="button" class="proxyip-picker-item recommended is-selected"
+													role="option" aria-selected="true" data-domain="ProxyIP.CMLiussss.net">
+													<span class="proxyip-picker-flag">🌐</span>
+													<span class="proxyip-picker-body">
+														<span class="proxyip-picker-name">全球</span>
+														<span class="proxyip-picker-domain">ProxyIP.CMLiussss.net</span>
+													</span>
+													<svg class="proxyip-picker-check" width="16" height="16" viewBox="0 0 24 24"
+														fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+														stroke-linejoin="round">
+														<polyline points="20 6 9 17 4 12" />
+													</svg>
+												</button>
+											</div>
+											<div class="proxyip-picker-group">
+												<div class="proxyip-picker-group-label">亚洲 <span class="proxyip-picker-count">5</span></div>
+												<button type="button" class="proxyip-picker-item" role="option" aria-selected="false"
+													data-domain="ProxyIP.HK.CMLiussss.net">
+													<span class="proxyip-picker-flag">🇭🇰</span>
+													<span class="proxyip-picker-body">
+														<span class="proxyip-picker-name">香港</span>
+														<span class="proxyip-picker-domain">ProxyIP.HK.CMLiussss.net</span>
+													</span>
+													<svg class="proxyip-picker-check" width="16" height="16" viewBox="0 0 24 24"
+														fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+														stroke-linejoin="round">
+														<polyline points="20 6 9 17 4 12" />
+													</svg>
+												</button>
+												<button type="button" class="proxyip-picker-item" role="option" aria-selected="false"
+													data-domain="ProxyIP.SG.CMLiussss.net">
+													<span class="proxyip-picker-flag">🇸🇬</span>
+													<span class="proxyip-picker-body">
+														<span class="proxyip-picker-name">新加坡</span>
+														<span class="proxyip-picker-domain">ProxyIP.SG.CMLiussss.net</span>
+													</span>
+													<svg class="proxyip-picker-check" width="16" height="16" viewBox="0 0 24 24"
+														fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+														stroke-linejoin="round">
+														<polyline points="20 6 9 17 4 12" />
+													</svg>
+												</button>
+												<button type="button" class="proxyip-picker-item" role="option" aria-selected="false"
+													data-domain="ProxyIP.JP.CMLiussss.net">
+													<span class="proxyip-picker-flag">🇯🇵</span>
+													<span class="proxyip-picker-body">
+														<span class="proxyip-picker-name">日本</span>
+														<span class="proxyip-picker-domain">ProxyIP.JP.CMLiussss.net</span>
+													</span>
+													<svg class="proxyip-picker-check" width="16" height="16" viewBox="0 0 24 24"
+														fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+														stroke-linejoin="round">
+														<polyline points="20 6 9 17 4 12" />
+													</svg>
+												</button>
+												<button type="button" class="proxyip-picker-item" role="option" aria-selected="false"
+													data-domain="ProxyIP.KR.CMLiussss.net">
+													<span class="proxyip-picker-flag">🇰🇷</span>
+													<span class="proxyip-picker-body">
+														<span class="proxyip-picker-name">韩国</span>
+														<span class="proxyip-picker-domain">ProxyIP.KR.CMLiussss.net</span>
+													</span>
+													<svg class="proxyip-picker-check" width="16" height="16" viewBox="0 0 24 24"
+														fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+														stroke-linejoin="round">
+														<polyline points="20 6 9 17 4 12" />
+													</svg>
+												</button>
+												<button type="button" class="proxyip-picker-item" role="option" aria-selected="false"
+													data-domain="ProxyIP.IN.CMLiussss.net">
+													<span class="proxyip-picker-flag">🇮🇳</span>
+													<span class="proxyip-picker-body">
+														<span class="proxyip-picker-name">印度</span>
+														<span class="proxyip-picker-domain">ProxyIP.IN.CMLiussss.net</span>
+													</span>
+													<svg class="proxyip-picker-check" width="16" height="16" viewBox="0 0 24 24"
+														fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+														stroke-linejoin="round">
+														<polyline points="20 6 9 17 4 12" />
+													</svg>
+												</button>
+											</div>
+											<div class="proxyip-picker-group">
+												<div class="proxyip-picker-group-label">欧洲 <span class="proxyip-picker-count">10</span></div>
+												<button type="button" class="proxyip-picker-item" role="option" aria-selected="false"
+													data-domain="ProxyIP.GB.CMLiussss.net">
+													<span class="proxyip-picker-flag">🇬🇧</span>
+													<span class="proxyip-picker-body">
+														<span class="proxyip-picker-name">英国</span>
+														<span class="proxyip-picker-domain">ProxyIP.GB.CMLiussss.net</span>
+													</span>
+													<svg class="proxyip-picker-check" width="16" height="16" viewBox="0 0 24 24"
+														fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+														stroke-linejoin="round">
+														<polyline points="20 6 9 17 4 12" />
+													</svg>
+												</button>
+												<button type="button" class="proxyip-picker-item" role="option" aria-selected="false"
+													data-domain="ProxyIP.FR.CMLiussss.net">
+													<span class="proxyip-picker-flag">🇫🇷</span>
+													<span class="proxyip-picker-body">
+														<span class="proxyip-picker-name">法国</span>
+														<span class="proxyip-picker-domain">ProxyIP.FR.CMLiussss.net</span>
+													</span>
+													<svg class="proxyip-picker-check" width="16" height="16" viewBox="0 0 24 24"
+														fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+														stroke-linejoin="round">
+														<polyline points="20 6 9 17 4 12" />
+													</svg>
+												</button>
+												<button type="button" class="proxyip-picker-item" role="option" aria-selected="false"
+													data-domain="ProxyIP.DE.CMLiussss.net">
+													<span class="proxyip-picker-flag">🇩🇪</span>
+													<span class="proxyip-picker-body">
+														<span class="proxyip-picker-name">德国</span>
+														<span class="proxyip-picker-domain">ProxyIP.DE.CMLiussss.net</span>
+													</span>
+													<svg class="proxyip-picker-check" width="16" height="16" viewBox="0 0 24 24"
+														fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+														stroke-linejoin="round">
+														<polyline points="20 6 9 17 4 12" />
+													</svg>
+												</button>
+												<button type="button" class="proxyip-picker-item" role="option" aria-selected="false"
+													data-domain="ProxyIP.NL.CMLiussss.net">
+													<span class="proxyip-picker-flag">🇳🇱</span>
+													<span class="proxyip-picker-body">
+														<span class="proxyip-picker-name">荷兰</span>
+														<span class="proxyip-picker-domain">ProxyIP.NL.CMLiussss.net</span>
+													</span>
+													<svg class="proxyip-picker-check" width="16" height="16" viewBox="0 0 24 24"
+														fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+														stroke-linejoin="round">
+														<polyline points="20 6 9 17 4 12" />
+													</svg>
+												</button>
+												<button type="button" class="proxyip-picker-item" role="option" aria-selected="false"
+													data-domain="ProxyIP.SE.CMLiussss.net">
+													<span class="proxyip-picker-flag">🇸🇪</span>
+													<span class="proxyip-picker-body">
+														<span class="proxyip-picker-name">瑞典</span>
+														<span class="proxyip-picker-domain">ProxyIP.SE.CMLiussss.net</span>
+													</span>
+													<svg class="proxyip-picker-check" width="16" height="16" viewBox="0 0 24 24"
+														fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+														stroke-linejoin="round">
+														<polyline points="20 6 9 17 4 12" />
+													</svg>
+												</button>
+												<button type="button" class="proxyip-picker-item" role="option" aria-selected="false"
+													data-domain="ProxyIP.FI.CMLiussss.net">
+													<span class="proxyip-picker-flag">🇫🇮</span>
+													<span class="proxyip-picker-body">
+														<span class="proxyip-picker-name">芬兰</span>
+														<span class="proxyip-picker-domain">ProxyIP.FI.CMLiussss.net</span>
+													</span>
+													<svg class="proxyip-picker-check" width="16" height="16" viewBox="0 0 24 24"
+														fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+														stroke-linejoin="round">
+														<polyline points="20 6 9 17 4 12" />
+													</svg>
+												</button>
+												<button type="button" class="proxyip-picker-item" role="option" aria-selected="false"
+													data-domain="ProxyIP.PL.CMLiussss.net">
+													<span class="proxyip-picker-flag">🇵🇱</span>
+													<span class="proxyip-picker-body">
+														<span class="proxyip-picker-name">波兰</span>
+														<span class="proxyip-picker-domain">ProxyIP.PL.CMLiussss.net</span>
+													</span>
+													<svg class="proxyip-picker-check" width="16" height="16" viewBox="0 0 24 24"
+														fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+														stroke-linejoin="round">
+														<polyline points="20 6 9 17 4 12" />
+													</svg>
+												</button>
+												<button type="button" class="proxyip-picker-item" role="option" aria-selected="false"
+													data-domain="ProxyIP.RU.CMLiussss.net">
+													<span class="proxyip-picker-flag">🇷🇺</span>
+													<span class="proxyip-picker-body">
+														<span class="proxyip-picker-name">俄罗斯</span>
+														<span class="proxyip-picker-domain">ProxyIP.RU.CMLiussss.net</span>
+													</span>
+													<svg class="proxyip-picker-check" width="16" height="16" viewBox="0 0 24 24"
+														fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+														stroke-linejoin="round">
+														<polyline points="20 6 9 17 4 12" />
+													</svg>
+												</button>
+												<button type="button" class="proxyip-picker-item" role="option" aria-selected="false"
+													data-domain="ProxyIP.CH.CMLiussss.net">
+													<span class="proxyip-picker-flag">🇨🇭</span>
+													<span class="proxyip-picker-body">
+														<span class="proxyip-picker-name">瑞士</span>
+														<span class="proxyip-picker-domain">ProxyIP.CH.CMLiussss.net</span>
+													</span>
+													<svg class="proxyip-picker-check" width="16" height="16" viewBox="0 0 24 24"
+														fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+														stroke-linejoin="round">
+														<polyline points="20 6 9 17 4 12" />
+													</svg>
+												</button>
+												<button type="button" class="proxyip-picker-item" role="option" aria-selected="false"
+													data-domain="ProxyIP.LV.CMLiussss.net">
+													<span class="proxyip-picker-flag">🇱🇻</span>
+													<span class="proxyip-picker-body">
+														<span class="proxyip-picker-name">拉脱维亚</span>
+														<span class="proxyip-picker-domain">ProxyIP.LV.CMLiussss.net</span>
+													</span>
+													<svg class="proxyip-picker-check" width="16" height="16" viewBox="0 0 24 24"
+														fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+														stroke-linejoin="round">
+														<polyline points="20 6 9 17 4 12" />
+													</svg>
+												</button>
+											</div>
+											<div class="proxyip-picker-group">
+												<div class="proxyip-picker-group-label">北美 <span class="proxyip-picker-count">2</span></div>
+												<button type="button" class="proxyip-picker-item" role="option" aria-selected="false"
+													data-domain="ProxyIP.US.CMLiussss.net">
+													<span class="proxyip-picker-flag">🇺🇸</span>
+													<span class="proxyip-picker-body">
+														<span class="proxyip-picker-name">美国</span>
+														<span class="proxyip-picker-domain">ProxyIP.US.CMLiussss.net</span>
+													</span>
+													<svg class="proxyip-picker-check" width="16" height="16" viewBox="0 0 24 24"
+														fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+														stroke-linejoin="round">
+														<polyline points="20 6 9 17 4 12" />
+													</svg>
+												</button>
+												<button type="button" class="proxyip-picker-item" role="option" aria-selected="false"
+													data-domain="ProxyIP.CA.CMLiussss.net">
+													<span class="proxyip-picker-flag">🇨🇦</span>
+													<span class="proxyip-picker-body">
+														<span class="proxyip-picker-name">加拿大</span>
+														<span class="proxyip-picker-domain">ProxyIP.CA.CMLiussss.net</span>
+													</span>
+													<svg class="proxyip-picker-check" width="16" height="16" viewBox="0 0 24 24"
+														fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+														stroke-linejoin="round">
+														<polyline points="20 6 9 17 4 12" />
+													</svg>
+												</button>
+											</div>
+										</div>
+										<div class="proxyip-picker-foot">💡 也可直接在输入框中填写任意 PROXYIP 域名 / IP</div>
+									</div>
+								</div>
 								<div class="checkbox-group">
 									<input type="checkbox" id="autoProxy" title="启用自动获取: 使用默认内置的PROXYIP"
 										onchange="toggleAutoProxy(); markModified('proxy')">
@@ -11766,11 +12789,6 @@
 							id="pathTemplateConfigBtn" onclick="showPathTemplateConfigModal()"
 							style="display: none; padding: 10px 16px;" title="配置路径模板">
 							⚙️ 路径模板配置
-						</button>
-						<button type="button" class="btn btn-search-proxy" id="getMoreProxyIPBtn"
-							onclick="showGetMoreProxyIPModal()" style="display: none; padding: 10px 16px;"
-							title="从 ProxyIP 列表中选择可用的代理">
-							🗺️ 获取更多 PROXYIP
 						</button>
 						<button type="button" class="btn btn-search-proxy" id="exploreSocks5Btn" hidden
 							onclick="showExploreSocks5Modal()" style="display: none; padding: 10px 16px;"
@@ -18041,61 +19059,6 @@
 		</div>
 	</div>
 
-	<!-- 获取更多 PROXYIP 弹窗 -->
-	<div class="modal-overlay" id="getMoreProxyIPModal">
-		<div class="modal">
-			<div class="modal-map-side">
-				<div id="proxy-map-proxyip" class="proxy-map-container"></div>
-			</div>
-			<div class="modal-content-side">
-				<button type="button" class="modal-close" onclick="closeGetMoreProxyIPModal(event)"
-					style="cursor: pointer;">×</button>
-				<h2 class="section-title" style="margin-bottom: 10px; text-align: center;">🗺️ 获取更多 PROXYIP</h2>
-				<p style="text-align: center; color: #666; font-size: 13px; margin-bottom: 20px;">
-					反代资源来自 Github、<a href="https://t.me/zip_cm_edu_kg" target="_blank"
-						rel="noopener noreferrer">CM科技大学</a>频道 等开源社区。
-				</p>
-				<div class="proxy-list-container">
-					<div class="form-group">
-						<label for="proxyIPDataRegionSelect">🏳️‍🌈 选择目标地区</label>
-						<div class="input-wrapper">
-							<select id="proxyIPDataRegionSelect" onchange="onProxyIPDataRegionChange()"
-								style="padding-left: 16px;">
-								<option value="">加载中...</option>
-							</select>
-						</div>
-					</div>
-
-					<div class="form-group" id="proxyIPProxySelectGroup">
-						<label for="proxyIPProxySelect">🌐 选择目标代理 (最多8个)</label>
-						<div class="input-wrapper">
-							<select id="proxyIPProxySelect" onchange="addSelectedProxyIP(); updateProxyMap('proxyip');"
-								style="padding-left: 16px; font-family: 'Fira Code', monospace; font-size: 12px;">
-								<option value=""></option>
-							</select>
-						</div>
-					</div>
-
-					<div id="selectedProxyIPsContainer" class="selected-proxies-tags"
-						style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 15px; min-height: 40px; padding: 10px; border: 1px dashed #e5e7eb; border-radius: 8px;">
-						<!-- 已选 IP 标签将显示在这里 -->
-					</div>
-				</div>
-
-				<div class="btn-group"
-					style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: auto; padding-top: 20px;">
-					<button type="button" class="btn btn-primary" id="proxyIPConfirmBtn"
-						onclick="confirmSelectProxyIP()" disabled>
-						确定
-					</button>
-					<button type="button" class="btn btn-secondary" onclick="closeGetMoreProxyIPModal(event)">
-						取消
-					</button>
-				</div>
-			</div>
-		</div>
-	</div>
-
 	<!-- 探索SOCKS5弹窗 -->
 	<div class="modal-overlay" id="exploreSocks5Modal">
 		<div class="modal">
@@ -18359,6 +19322,112 @@
 		</div>
 	</div>
 
+	<!-- 连接复用（XHTTP xmux 参数）详细设置弹窗 -->
+	<div class="modal-overlay" id="xmuxModal" onclick="closeXmuxModal(event)">
+		<div class="modal xmux-modal" onclick="event.stopPropagation()">
+			<button type="button" class="modal-close" onclick="closeXmuxModal()">×</button>
+			<h2 class="subapi-modal-title xmux-modal-title">🔗 连接复用详细设置</h2>
+			<p class="xmux-modal-subtitle">仅 XHTTP 传输协议生效。除「保活心跳间隔」外，其余参数都支持整数或范围写法（如 16-32，客户端每次从中随机取值）。</p>
+
+			<div class="xmux-intro">
+				⚠️ <strong>6 项全部为 0</strong> 时，Xray 会套用内置默认值（并发 16-32、请求 600-900、可复用 1800-3000
+				秒，均随机）；一旦填写其中<strong>任意一项</strong>，其余项的 0 就表示「不限制」。<br>
+				范围写法形如 <strong>16-32</strong>，表示客户端每次从区间内随机取一个整数。<br>
+				官方文档：<a href="https://xtls.github.io/config/transports/xhttp.html" target="_blank"
+					rel="noopener">XHTTP 传输配置</a> · <a href="https://github.com/XTLS/Xray-core/discussions/4113"
+					target="_blank" rel="noopener">XHTTP: Beyond REALITY（XMUX 参数说明）</a>
+			</div>
+
+			<div class="xmux-grid">
+				<div class="xmux-field" id="xmuxFieldMaxConnections">
+					<div class="xmux-field-head">
+						<span class="xmux-field-name">最大连接数</span>
+						<span class="xmux-field-key">maxConnections</span>
+					</div>
+					<input type="text" id="xmuxMaxConnections" placeholder="0 或 2-4" autocomplete="off" spellcheck="false"
+						title="客户端最多同时维持的 HTTP 连接条数，可填整数或范围（如 2-4）；0 表示不限制。与「最大并发数」互斥。"
+						oninput="handleXmuxFieldInput(event, 'maxConnections')"
+						onchange="handleXmuxFieldCommit(event, 'maxConnections')">
+					<p class="xmux-field-desc">客户端最多同时维持的 HTTP 连接条数；0 表示不限制，也可填范围（如 2-4）。与「最大并发数」互斥，两者不能同时设置。</p>
+					<p class="xmux-field-error" id="xmuxErrMaxConnections"></p>
+				</div>
+
+				<div class="xmux-field" id="xmuxFieldMaxConcurrency">
+					<div class="xmux-field-head">
+						<span class="xmux-field-name">最大并发数</span>
+						<span class="xmux-field-key">maxConcurrency</span>
+					</div>
+					<input type="text" id="xmuxMaxConcurrency" placeholder="0 或 16-32" autocomplete="off" spellcheck="false"
+						title="单条 HTTP 连接上可同时承载的代理请求数，可填整数或范围（如 16-32）；0 表示不限制。与「最大连接数」互斥。"
+						oninput="handleXmuxFieldInput(event, 'maxConcurrency')"
+						onchange="handleXmuxFieldCommit(event, 'maxConcurrency')">
+					<p class="xmux-field-desc">单条 HTTP 连接上可同时承载的代理请求数，达到上限后会新建连接；0 表示不限制，可填范围（如 16-32）。与「最大连接数」互斥。</p>
+					<p class="xmux-field-error" id="xmuxErrMaxConcurrency"></p>
+				</div>
+
+				<div class="xmux-field" id="xmuxFieldCMaxReuseTimes">
+					<div class="xmux-field-head">
+						<span class="xmux-field-name">连接最大复用次数</span>
+						<span class="xmux-field-key">cMaxReuseTimes</span>
+					</div>
+					<input type="text" id="xmuxCMaxReuseTimes" placeholder="0 或 10-20" autocomplete="off" spellcheck="false"
+						title="一条连接最多被复用多少次，可填整数或范围；0 表示不限制。"
+						oninput="handleXmuxFieldInput(event, 'cMaxReuseTimes')"
+						onchange="handleXmuxFieldCommit(event, 'cMaxReuseTimes')">
+					<p class="xmux-field-desc">一条连接最多被复用多少次，达到后不再分配新请求，等最后一条请求结束后断开；0 表示不限制，可填范围。</p>
+					<p class="xmux-field-error" id="xmuxErrCMaxReuseTimes"></p>
+				</div>
+
+				<div class="xmux-field" id="xmuxFieldHMaxRequestTimes">
+					<div class="xmux-field-head">
+						<span class="xmux-field-name">连接最大请求数</span>
+						<span class="xmux-field-key">hMaxRequestTimes</span>
+					</div>
+					<input type="text" id="xmuxHMaxRequestTimes" placeholder="0 或 600-900" autocomplete="off" spellcheck="false"
+						title="一条连接最多承载多少个 HTTP 请求，可填整数或范围（如 600-900）；0 表示不限制。"
+						oninput="handleXmuxFieldInput(event, 'hMaxRequestTimes')"
+						onchange="handleXmuxFieldCommit(event, 'hMaxRequestTimes')">
+					<p class="xmux-field-desc">一条连接最多承载多少个 HTTP 请求，超过后不再复用该连接；0 表示不限制，可填范围（如 600-900）。</p>
+					<p class="xmux-field-error" id="xmuxErrHMaxRequestTimes"></p>
+				</div>
+
+				<div class="xmux-field" id="xmuxFieldHMaxReusableSecs">
+					<div class="xmux-field-head">
+						<span class="xmux-field-name">连接最长可复用秒数</span>
+						<span class="xmux-field-key">hMaxReusableSecs</span>
+					</div>
+					<input type="text" id="xmuxHMaxReusableSecs" placeholder="0 或 1800-3000" autocomplete="off" spellcheck="false"
+						title="一条连接自建立起最长可被复用的秒数，可填整数或范围（如 1800-3000）；0 表示不限制。"
+						oninput="handleXmuxFieldInput(event, 'hMaxReusableSecs')"
+						onchange="handleXmuxFieldCommit(event, 'hMaxReusableSecs')">
+					<p class="xmux-field-desc">一条连接自建立起最长可被复用的秒数，超时后不再复用；0 表示不限制，可填范围（如 1800-3000）。</p>
+					<p class="xmux-field-error" id="xmuxErrHMaxReusableSecs"></p>
+				</div>
+
+				<div class="xmux-field" id="xmuxFieldHKeepAlivePeriod">
+					<div class="xmux-field-head">
+						<span class="xmux-field-name">保活心跳间隔（秒）</span>
+						<span class="xmux-field-key">hKeepAlivePeriod</span>
+					</div>
+					<input type="text" id="xmuxHKeepAlivePeriod" placeholder="0" autocomplete="off" spellcheck="false"
+						title="H2/H3 连接的保活心跳间隔（秒），只支持整数；0 表示使用内核默认，负数表示关闭保活。"
+						oninput="handleXmuxFieldInput(event, 'hKeepAlivePeriod')"
+						onchange="handleXmuxFieldCommit(event, 'hKeepAlivePeriod')">
+					<p class="xmux-field-desc">H2/H3 连接的保活心跳间隔（秒），只支持整数；0 表示使用内核默认，负数表示关闭保活。</p>
+					<p class="xmux-field-error" id="xmuxErrHKeepAlivePeriod"></p>
+				</div>
+			</div>
+
+			<div class="xmux-buttons">
+				<button type="button" class="btn btn-secondary" id="xmuxResetBtn" onclick="resetXmuxDefaults()">还原默认参数</button>
+				<div class="xmux-btn-group">
+					<button type="button" class="btn btn-secondary" id="xmuxCancelBtn" onclick="closeXmuxModal()">取消</button>
+					<button type="button" class="btn btn-primary" id="xmuxSaveBtn" onclick="saveXmuxSettings()">保存</button>
+				</div>
+			</div>
+		</div>
+	</div>
+
 	<script data-cfasync="false">
 		let currentConfig = {};
 		let originalConfig = {};
@@ -18377,6 +19446,7 @@
 		const CHAIN_PROXY_MIN_VERSION = 20260506175102;
 		const SKIP_VERIFY_WARNING_BYPASS_MIN_VERSION = 20260601154939;
 		const ALPN_FEATURE_MIN_VERSION = 20260904162413;
+		const XMUX_FEATURE_MIN_VERSION = 20261110232646;
 		const ECH_SUPPORTED_FINGERPRINTS = ['chrome', 'firefox'];
 		let cachedWorkerVersionRawText = '';
 		let cachedLatestOnlineVersion = 0;
@@ -18389,8 +19459,34 @@
 		let turnSstpProxyFeatureEnabled = false;
 		let chainProxyFeatureEnabled = false;
 		let alpnFeatureEnabled = false;
+		let xmuxFeatureEnabled = false;
+		let xmuxSaving = false;
 		let proxyFeatureAvailabilityInitialized = false;
 		const PROXY_PROTOCOLS = ['socks5', 'http', 'https', 'turn', 'sstp'];
+
+		// 连接复用（XHTTP xmux）：字段元数据，key 与后端配置键名保持一致
+		// allowRange：Xray 除 hKeepAlivePeriod 外均支持 "min-max" 范围写法（每次连接随机取一个值）
+		const XMUX_FIELD_KEYS = ['maxConnections', 'maxConcurrency', 'cMaxReuseTimes', 'hMaxRequestTimes', 'hMaxReusableSecs', 'hKeepAlivePeriod'];
+		const XMUX_FIELD_META = {
+			maxConnections: { inputId: 'xmuxMaxConnections', fieldId: 'xmuxFieldMaxConnections', errorId: 'xmuxErrMaxConnections', allowNegative: false, allowRange: true },
+			maxConcurrency: { inputId: 'xmuxMaxConcurrency', fieldId: 'xmuxFieldMaxConcurrency', errorId: 'xmuxErrMaxConcurrency', allowNegative: false, allowRange: true },
+			cMaxReuseTimes: { inputId: 'xmuxCMaxReuseTimes', fieldId: 'xmuxFieldCMaxReuseTimes', errorId: 'xmuxErrCMaxReuseTimes', allowNegative: false, allowRange: true },
+			hMaxRequestTimes: { inputId: 'xmuxHMaxRequestTimes', fieldId: 'xmuxFieldHMaxRequestTimes', errorId: 'xmuxErrHMaxRequestTimes', allowNegative: false, allowRange: true },
+			hMaxReusableSecs: { inputId: 'xmuxHMaxReusableSecs', fieldId: 'xmuxFieldHMaxReusableSecs', errorId: 'xmuxErrHMaxReusableSecs', allowNegative: false, allowRange: true },
+			hKeepAlivePeriod: { inputId: 'xmuxHKeepAlivePeriod', fieldId: 'xmuxFieldHKeepAlivePeriod', errorId: 'xmuxErrHKeepAlivePeriod', allowNegative: true, allowRange: false }
+		};
+		// 「还原默认设置」使用的默认值
+		const XMUX_DEFAULT_VALUES = {
+			maxConnections: 4,
+			maxConcurrency: 0,
+			cMaxReuseTimes: 0,
+			hMaxRequestTimes: 0,
+			hMaxReusableSecs: 3600,
+			hKeepAlivePeriod: 0
+		};
+		// Xray 这几个字段是 int32，归一化时做硬上界，避免超界导致后端配置解析失败
+		const XMUX_INT_MAX = 2147483647;
+		const XMUX_INT_MIN = -2147483647;
 
 		function parseForcedLowPerformanceMode() {
 			try {
@@ -19110,7 +20206,6 @@
 				setProxyModeSelection('auto');
 				document.getElementById('proxyIP').value = currentConfig.反代?.PROXYIP || '';
 				document.getElementById('autoProxy').checked = (currentConfig.反代?.PROXYIP === 'auto');
-				document.getElementById('proxyIP').disabled = (currentConfig.反代?.PROXYIP === 'auto');
 			} else {
 				setProxyModeSelection(socksEnabled);
 				populateProxyProtocolFromConfig(getSelectedProxyProtocol());
@@ -19126,10 +20221,13 @@
 			turnSstpProxyFeatureEnabled = versionNumber >= TURN_SSTP_PROXY_MIN_VERSION;
 			chainProxyFeatureEnabled = versionNumber >= CHAIN_PROXY_MIN_VERSION;
 			alpnFeatureEnabled = versionNumber >= ALPN_FEATURE_MIN_VERSION;
+			xmuxFeatureEnabled = versionNumber >= XMUX_FEATURE_MIN_VERSION;
 			updateChainProxyButtonVisibility();
 			// 版本号是异步拿到的，sstp 胶囊要等这里才知道能不能显示，所以再渲染一次
 			renderChainLibProtocols();
 			updateALPNGroupVisibility();
+			// 连接复用的显隐同样依赖版本号，renderUI 执行时版本号还没到手，这里补一次刷新
+			syncXmuxFromConfig();
 
 			const httpsOption = document.getElementById('httpsProxyOption');
 			if (httpsOption) {
@@ -20485,6 +21583,7 @@
 			document.getElementById('protocol').value = currentConfig.协议类型 || 'vless';
 			syncTransportSettingsFromConfig();
 			updateProtocol();
+			syncXmuxFromConfig();
 
 			// 检查跳过证书验证字段是否存在
 			const skipVerifyGroup = document.getElementById('skipVerifyGroup');
@@ -20934,6 +22033,8 @@
 		function handleTransportChange() {
 			updateGrpcModeVisibility();
 			updateTransportGrpcTooltipVisibility(true);
+			// 只有 XHTTP 传输协议才显示「连接复用」
+			syncXmuxRowVisibility();
 			const protocolSelect = document.getElementById('protocol');
 			updateProtocolOptionAvailability(protocolSelect ? protocolSelect.value : '');
 			markModified('config');
@@ -21117,6 +22218,8 @@
 				transport.disabled = shouldLockTransport;
 				updateGrpcModeVisibility();
 				updateTransportGrpcTooltipVisibility(false);
+				// 协议切到 ss 会把传输协议强制改成 ws，这里同步刷新「连接复用」的显隐
+				syncXmuxRowVisibility();
 			}
 
 			// 协议/TLS 变化会影响 ECH 可用性
@@ -21219,14 +22322,12 @@
 			}
 		}
 
-		// 填充ECH DNS下拉框
+		// 填充 ECH DNS 字段（函数名沿用旧调用点：文本框可自由输入，同时同步隐藏域）
 		function populateEchDNSSelect() {
 			const formGroup = document.getElementById('echDNSGroup');
-			const select = document.getElementById('echDNSSelect');
-			const customInput = document.getElementById('echDNSCustomInput');
-			const hiddenValue = document.getElementById('echDNSValue');
+			const inputEl = document.getElementById('echDNSInput');
 
-			if (!select || !formGroup) return;
+			if (!inputEl || !formGroup) return;
 
 			// 检查ECHConfig.DNS字段是否存在
 			if (currentConfig.ECHConfig?.DNS === undefined) {
@@ -21234,43 +22335,21 @@
 				return;
 			}
 
-			// 显示form-group和下拉框
+			// 显示 form-group 并回填当前配置值
 			formGroup.style.display = 'grid';
-			select.style.display = 'block';
-
-			// 如果已有保存的DNS值，设置选中状态
-			const savedDNS = currentConfig.ECHConfig?.DNS || '';
-			if (savedDNS) {
-				// 尝试在下拉框中找到匹配的选项
-				select.value = savedDNS;
-
-				// 如果没有匹配到（值不在列表中），选择"自定义"并显示输入框
-				if (select.value !== savedDNS) {
-					select.value = 'custom';
-					customInput.value = savedDNS;
-					customInput.style.display = 'block';
-					hiddenValue.value = savedDNS;
-				} else {
-					// 匹配成功，隐藏自定义输入框
-					customInput.style.display = 'none';
-					customInput.value = '';
-					hiddenValue.value = savedDNS;
-				}
-			} else {
-				// 没有保存值，默认选择"自定义"
-				select.value = 'custom';
-				customInput.style.display = 'block';
-			}
+			// 回填阶段不触发「国内 DNS 自动改解析域名」的联动，也不标记为已修改
+			setEchDNSFieldValue(currentConfig.ECHConfig?.DNS || '', {
+				skipAutoAdjust: true,
+				skipMarkModified: true
+			});
 		}
 
-		// 填充ECH SNI下拉框
+		// 填充 ECH 解析域名字段（函数名沿用旧调用点：文本框为空即代表「自动获取」）
 		function populateEchSNISelect() {
 			const formGroup = document.getElementById('echSNIGroup');
-			const select = document.getElementById('echSNISelect');
-			const customInput = document.getElementById('echSNICustomInput');
-			const hiddenValue = document.getElementById('echSNIValue');
+			const inputEl = document.getElementById('echSNIInput');
 
-			if (!select || !formGroup) return;
+			if (!inputEl || !formGroup) return;
 
 			// 检查ECHConfig.SNI字段是否存在
 			if (currentConfig.ECHConfig?.SNI === undefined) {
@@ -21278,128 +22357,807 @@
 				return;
 			}
 
-			// 显示form-group和下拉框
+			// 显示 form-group 并回填当前配置值
 			formGroup.style.display = 'grid';
-			select.style.display = 'block';
-
-			// 如果已有保存的SNI值，设置选中状态
+			// null / 空字符串均表示「自动获取」：清空文本框进入自动态
 			const savedSNI = currentConfig.ECHConfig?.SNI;
-			if (savedSNI !== undefined) {
-				if (savedSNI === null) {
-					// 自动获取
-					select.value = '__AUTO__';
-					customInput.style.display = 'none';
-					customInput.value = '';
-					hiddenValue.value = null;
-				} else {
-					// 尝试在下拉框中找到匹配的选项
-					select.value = savedSNI;
+			setEchSNIFieldValue((savedSNI === null || savedSNI === undefined) ? '' : savedSNI, {
+				skipMarkModified: true
+			});
+		}
 
-					// 如果没有匹配到（值不在列表中），选择"自定义"并显示输入框
-					if (select.value !== savedSNI) {
-						select.value = 'custom';
-						customInput.value = savedSNI;
-						customInput.style.display = 'block';
-						hiddenValue.value = savedSNI;
+		// ========== ECH 预设下拉（自绘面板，与 PROXYIP 完全同款交互） ==========
+		// 预设值会写入 Worker 配置，必须与旧 <option> 逐字一致；
+		// region 用于「国内 DNS + 自动解析域名」联动判定，desc 缺省时用 value 当等宽说明行
+		const ECH_DNS_PRESET_GROUPS = [
+			{
+				label: '国际 DNS', items: [
+					{ value: 'udp://208.67.220.220:443', name: 'OpenDNS', flag: '🔓', region: 'international' },
+					{ value: 'udp://149.112.112.112:9953', name: 'Quad9', flag: '9️⃣', region: 'international' },
+					{ value: 'udp://45.90.28.0:5353', name: 'NextDNS', flag: '🎛️', region: 'international' },
+					{ value: 'udp://188.166.206.224:5003', name: 'Tiarap', flag: '🚧', region: 'international' },
+					{
+						value: 'https://doh.applied-privacy.net/query',
+						name: 'Applied Privacy DoH',
+						flag: '🕶️',
+						region: 'international'
+					},
+					{ value: 'https://odvr.nic.cz/doh', name: 'CZ.NIC DoH', flag: '🏛️', region: 'international' }
+				]
+			},
+			{
+				label: '国内 DNS（需搭配设置ECH解析域名，是否可用需自行验证）', items: [
+					{ value: 'https://dns.alidns.com/dns-query', name: '阿里 DoH', flag: '🅰️', region: 'domestic', recommended: true },
+					{ value: 'https://sm2.doh.pub/dns-query', name: '腾讯国密 DoH', flag: '🐧', region: 'domestic' },
+					{ value: 'https://doh.360.cn/dns-query', name: '360 DoH', flag: '🛡️', region: 'domestic' },
+					{ value: 'https://doh.onedns.net/dns-query', name: 'OneDNS DoH', flag: '1️⃣', region: 'domestic' }
+				]
+			}
+		];
+
+		const ECH_DNS_PANEL_FOOT = '国内 DNS 需搭配设置 ECH 解析域名（默认 cloudflare-ech.com），是否可用需自行验证。';
+
+		const ECH_SNI_PRESET_GROUPS = [
+			{
+				label: '✨ 推荐', accent: true, items: [
+					{
+						value: '__AUTO__',
+						name: '自动获取',
+						flag: '🔄',
+						desc: '使用节点的伪装域名解析 EchConfig',
+						descAsNote: true
+					},
+					{ value: 'cloudflare-ech.com', name: 'Cloudflare ECH 域名', flag: '🌐', recommended: true }
+				]
+			},
+			{
+				label: '其他 ECH 域名', items: [
+					{ value: 'crypto.cloudflare.com', name: 'Cloudflare 密码学服务', flag: '🔐' },
+					{ value: 'encryptedsni.com', name: 'Cloudflare 加密 SNI', flag: '🔒' },
+					{ value: 'icook.hk', name: '愛料理 HK', flag: '🍳' },
+					{ value: 'cm.edu.kg', name: 'CM科技大学', flag: '🎓' },
+					{ value: 'godotengine.org', name: 'Godot 开源游戏引擎', flag: '🎮' },
+					{ value: 'www.britannica.com', name: '大英百科全书', flag: '📚' },
+					{ value: 'www.prometheus.io', name: 'Prometheus 监控系统', flag: '📈' },
+					{ value: 'www.kyocera.com', name: 'Kyocera 集团官网', flag: '🏢' },
+					{ value: 'celestia.org', name: 'Celestia 模块化区块链', flag: '🛰️' },
+					{ value: 'lido.fi', name: 'Lido 流动质押', flag: '💧' }
+				]
+			}
+		];
+
+		const ECH_SNI_PANEL_FOOT = '此处域名仅用于解析 EchConfig，并非 ECH 伪装域名。';
+
+		// 「自动获取」的语义 = 文本框为空（隐藏域写 ''，保存时由 saveEch 转成 null）
+		const ECH_SNI_AUTO_VALUE = '__AUTO__';
+		const ECH_SNI_AUTO_PLACEHOLDER = '自动获取（使用节点的伪装域名解析 EchConfig）';
+		const ECH_SNI_DEFAULT_PLACEHOLDER = 'cloudflare-ech.com';
+		// 国内 DNS 与「自动获取」解析域名冲突时改用的兜底域名
+		const ECH_DOMESTIC_DNS_FALLBACK_SNI = 'cloudflare-ech.com';
+		const ECH_DOMESTIC_DNS_WARNING = '⚠️ ECH 配置提示\n\n默认使用节点HOST伪装域名 配合 国内 DNS 可能导致 ECH 解析失败。\n\n解决方案（任选其一）：\n① 将 ECH 解析域名改为 cloudflare-ech.com（推荐）\n② 将 ECH DNS 切换为国际服务（如 NextDNS）';
+
+		// 面板关闭函数注册表：保证同一时刻只允许一个 ECH 面板打开
+		const ECH_PICKER_CLOSERS = {};
+
+		// 在预设分组里按值查条目（用于国内 DNS 判定）
+		function findEchPreset(groups, value) {
+			const target = (value === undefined || value === null) ? '' : String(value).trim();
+			if (!target || !groups) return null;
+			for (let i = 0; i < groups.length; i++) {
+				const items = groups[i].items || [];
+				for (let j = 0; j < items.length; j++) {
+					if (items[j].value === target) return items[j];
+				}
+			}
+			return null;
+		}
+
+		// 当前 EchConfig DNS 服务的地区；自定义值/空值返回 null（与旧 select 的 data-region 行为一致）
+		function getEchDNSRegion(value) {
+			const matched = findEchPreset(ECH_DNS_PRESET_GROUPS, value);
+			return matched ? matched.region : null;
+		}
+
+		// 生成条目右侧的选中对勾（与 PROXYIP 面板同一套 svg）
+		function createEchPresetCheckIcon() {
+			const SVG_NS = 'http://www.w3.org/2000/svg';
+			const svg = document.createElementNS(SVG_NS, 'svg');
+			svg.setAttribute('class', 'proxyip-picker-check');
+			svg.setAttribute('width', '16');
+			svg.setAttribute('height', '16');
+			svg.setAttribute('viewBox', '0 0 24 24');
+			svg.setAttribute('fill', 'none');
+			svg.setAttribute('stroke', 'currentColor');
+			svg.setAttribute('stroke-width', '2.5');
+			svg.setAttribute('stroke-linecap', 'round');
+			svg.setAttribute('stroke-linejoin', 'round');
+			const polyline = document.createElementNS(SVG_NS, 'polyline');
+			polyline.setAttribute('points', '20 6 9 17 4 12');
+			svg.appendChild(polyline);
+			return svg;
+		}
+
+		// 渲染单个预设条目：data-value 存值（对标 PROXYIP 的 data-domain），data-region 存地区
+		function createEchPresetItem(preset) {
+			const item = document.createElement('button');
+			item.type = 'button';
+			item.className = 'proxyip-picker-item' + (preset.recommended ? ' recommended' : '');
+			item.setAttribute('role', 'option');
+			item.setAttribute('aria-selected', 'false');
+			item.setAttribute('data-value', preset.value);
+			if (preset.region) item.setAttribute('data-region', preset.region);
+
+			const flagEl = document.createElement('span');
+			flagEl.className = 'proxyip-picker-flag';
+			flagEl.textContent = preset.flag || '🌐';
+
+			const bodyEl = document.createElement('span');
+			bodyEl.className = 'proxyip-picker-body';
+
+			const nameEl = document.createElement('span');
+			nameEl.className = 'proxyip-picker-name';
+			nameEl.textContent = preset.name || preset.value;
+
+			const descEl = document.createElement('span');
+			descEl.className = 'proxyip-picker-domain' + (preset.descAsNote ? ' is-note' : '');
+			descEl.textContent = preset.desc || preset.value;
+			// 说明行用说明文字本身作 title；域名行用域名作 title（宽面板下可能被省略号截断）
+			if (preset.desc) descEl.title = preset.descAsNote ? preset.desc : preset.value;
+
+			bodyEl.appendChild(nameEl);
+			bodyEl.appendChild(descEl);
+			item.appendChild(flagEl);
+			item.appendChild(bodyEl);
+			item.appendChild(createEchPresetCheckIcon());
+			return item;
+		}
+
+		// 把分组数据渲染进面板（纯 DOM 构建，不拼 innerHTML）
+		function renderEchPresetPanel(panel, groups, footText) {
+			if (!panel || !groups) return;
+			panel.textContent = '';
+			const scrollEl = document.createElement('div');
+			scrollEl.className = 'proxyip-picker-scroll';
+			groups.forEach(function (group) {
+				const groupEl = document.createElement('div');
+				groupEl.className = 'proxyip-picker-group';
+
+				const labelEl = document.createElement('div');
+				labelEl.className = 'proxyip-picker-group-label' + (group.accent ? ' accent' : '');
+				labelEl.appendChild(document.createTextNode(group.label));
+				// 推荐组不加数量徽标（与 PROXYIP 面板一致）
+				if (!group.accent) {
+					const countEl = document.createElement('span');
+					countEl.className = 'proxyip-picker-count';
+					countEl.textContent = String((group.items || []).length);
+					labelEl.appendChild(countEl);
+				}
+				groupEl.appendChild(labelEl);
+
+				(group.items || []).forEach(function (preset) {
+					groupEl.appendChild(createEchPresetItem(preset));
+				});
+				scrollEl.appendChild(groupEl);
+			});
+			panel.appendChild(scrollEl);
+
+			if (footText) {
+				const footEl = document.createElement('div');
+				footEl.className = 'proxyip-picker-foot';
+				footEl.textContent = footText;
+				panel.appendChild(footEl);
+			}
+		}
+
+		// 按当前值同步面板选中态；isAutoMode 为真时命中「自动获取」条目
+		function syncEchPresetPanelSelection(panelId, value, isAutoMode) {
+			const panel = document.getElementById(panelId);
+			if (!panel) return;
+			const target = isAutoMode ? ECH_SNI_AUTO_VALUE : value;
+			const items = panel.querySelectorAll('.proxyip-picker-item');
+			Array.prototype.forEach.call(items, function (item) {
+				const hit = item.getAttribute('data-value') === target;
+				item.classList.toggle('is-selected', hit);
+				item.setAttribute('aria-selected', hit ? 'true' : 'false');
+			});
+		}
+
+		// 写入 EchConfig DNS 值：文本框、隐藏域、面板选中态收敛到这一处，避免多处改状态造成漂移
+		function setEchDNSFieldValue(value, opts) {
+			const options = opts || {};
+			const inputEl = document.getElementById('echDNSInput');
+			const hiddenValue = document.getElementById('echDNSValue');
+			const next = (value === undefined || value === null) ? '' : String(value).trim();
+
+			if (inputEl && inputEl.value !== next) inputEl.value = next;
+			if (hiddenValue) hiddenValue.value = next;
+			syncEchPresetPanelSelection('echDNSPresetPanel', next, false);
+
+			// 沿用旧「DNS 下拉框 change」行为：国内 DNS + 解析域名为「自动获取」时静默改成 cloudflare-ech.com
+			if (!options.skipAutoAdjust && getEchDNSRegion(next) === 'domestic') {
+				const sniInputEl = document.getElementById('echSNIInput');
+				if (sniInputEl && sniInputEl.value.trim() === '') {
+					setEchSNIFieldValue(ECH_DOMESTIC_DNS_FALLBACK_SNI, { skipMarkModified: true });
+				}
+			}
+
+			if (!options.skipMarkModified) markModified('ech');
+		}
+
+		// 解析域名只接受主机名：用户把整段 URL 粘进来（带协议/账号/端口/路径/查询参数）时
+		// 自动取出域名部分，例如
+		// https://mxdc.dvg.cn/career_skill_guide.php?build=ice-lightning → mxdc.dvg.cn
+		function normalizeEchSNIHost(value) {
+			let text = (value === undefined || value === null) ? '' : String(value).trim();
+			if (!text) return '';
+			// 1. 去掉协议前缀（http:// https:// wss:// quic:// 等任意 scheme://）
+			text = text.replace(/^[a-zA-Z][a-zA-Z0-9+.\-]*:\/\//, '');
+			// 2. 去掉协议相对写法 //host/path
+			if (text.indexOf('//') === 0) text = text.slice(2);
+			// 3. 去掉 user:pass@ 前缀：最后一个 @ 之后才是主机
+			const atIndex = text.lastIndexOf('@');
+			if (atIndex !== -1) text = text.slice(atIndex + 1);
+			// 4. 去掉路径、查询参数与锚点
+			text = text.split(/[\/?#]/)[0];
+			// 5. 去掉端口；IPv6 字面量只保留方括号内的地址
+			if (text.charAt(0) === '[') {
+				const closeBracket = text.indexOf(']');
+				if (closeBracket !== -1) text = text.slice(0, closeBracket + 1);
+			} else {
+				const colonIndex = text.indexOf(':');
+				if (colonIndex !== -1) text = text.slice(0, colonIndex);
+			}
+			return text.trim();
+		}
+
+		// 写入 EchConfig 解析域名：空值即「自动获取」（隐藏域写 ''，保存时由 saveEch 转成 null）
+		function setEchSNIFieldValue(value, opts) {
+			const options = opts || {};
+			const inputEl = document.getElementById('echSNIInput');
+			const hiddenValue = document.getElementById('echSNIValue');
+			const raw = (value === undefined || value === null || value === ECH_SNI_AUTO_VALUE)
+				? ''
+				: String(value).trim();
+			// normalize 仅在失焦/保存兜底时开启：打字过程中不做裁剪，避免边输边被改
+			const next = (options.normalize && raw) ? normalizeEchSNIHost(raw) : raw;
+
+			if (inputEl) {
+				if (inputEl.value !== next) inputEl.value = next;
+				if (next) {
+					inputEl.placeholder = ECH_SNI_DEFAULT_PLACEHOLDER;
+					inputEl.classList.remove('ech-auto-mode');
+				} else {
+					inputEl.placeholder = ECH_SNI_AUTO_PLACEHOLDER;
+					inputEl.classList.add('ech-auto-mode');
+				}
+			}
+			if (hiddenValue) hiddenValue.value = next;
+			syncEchPresetPanelSelection('echSNIPresetPanel', next, next === '');
+
+			if (!options.skipMarkModified) markModified('ech');
+			return next;
+		}
+
+		// EchConfig DNS服务 文本框输入（可自由输入任意 udp:// / https:// 地址）
+		function onEchDNSInput() {
+			const inputEl = document.getElementById('echDNSInput');
+			if (!inputEl) return;
+			setEchDNSFieldValue(inputEl.value);
+		}
+
+		// EchConfig 解析域名 文本框输入；清空即回到「自动获取」（手动清空不弹提示）
+		function onEchSNIInput() {
+			const inputEl = document.getElementById('echSNIInput');
+			if (!inputEl) return;
+			setEchSNIFieldValue(inputEl.value);
+		}
+
+		// 解析域名失焦/回车时清洗：整段 URL → 纯域名（打字过程中不裁剪，避免边输边被改）
+		function onEchSNIChange() {
+			const inputEl = document.getElementById('echSNIInput');
+			if (!inputEl) return;
+			const before = inputEl.value.trim();
+			const next = setEchSNIFieldValue(inputEl.value, { normalize: true });
+			if (next && next !== before) {
+				showToast('已自动清洗为纯域名：' + next, 'info');
+			}
+		}
+
+		// 点选某个 ECH 预设条目：写入字段 → 关闭面板 → 焦点还给触发按钮 → 短暂琥珀色反馈
+		function selectEchPresetItem(kind, item) {
+			if (!item) return;
+			const isSni = kind === 'sni';
+			const rawValue = item.getAttribute('data-value') || '';
+			const inputEl = document.getElementById(isSni ? 'echSNIInput' : 'echDNSInput');
+			const trigger = document.getElementById(isSni ? 'echSNIPresetTrigger' : 'echDNSPresetTrigger');
+
+			if (isSni) {
+				if (rawValue === ECH_SNI_AUTO_VALUE) {
+					// 沿用旧「解析域名下拉框 change」行为：仅在「从面板点自动获取」时弹提示，
+					// 国内 DNS 与自动解析域名冲突 → 改用 cloudflare-ech.com
+					// （旧实现只改了 select 未同步隐藏域，这里一并写入）
+					const dnsInputEl = document.getElementById('echDNSInput');
+					if (dnsInputEl && getEchDNSRegion(dnsInputEl.value) === 'domestic') {
+						alert(ECH_DOMESTIC_DNS_WARNING);
+						setEchSNIFieldValue(ECH_DOMESTIC_DNS_FALLBACK_SNI);
 					} else {
-						// 匹配成功，隐藏自定义输入框
-						customInput.style.display = 'none';
-						customInput.value = '';
-						hiddenValue.value = savedSNI;
+						setEchSNIFieldValue('');
+					}
+				} else {
+					setEchSNIFieldValue(rawValue);
+				}
+			} else {
+				setEchDNSFieldValue(rawValue);
+			}
+
+			// 选中反馈：输入框文字短暂染上琥珀色（约 900ms）
+			if (inputEl) {
+				inputEl.classList.add('ech-picker-flash');
+				setTimeout(function () {
+					inputEl.classList.remove('ech-picker-flash');
+				}, 900);
+			}
+
+			const closer = ECH_PICKER_CLOSERS[kind];
+			if (typeof closer === 'function') closer();
+			if (trigger) trigger.focus();
+		}
+
+		// 初始化单个 ECH 预设下拉：panel portal 到 body、JS fixed 定位与翻转、滚动跟随、键盘导航、外点关闭
+		function setupEchPresetPicker(config) {
+			const group = document.getElementById(config.groupId);
+			if (!group) return;
+			const box = group.querySelector('.ech-picker-box');
+			const inputEl = document.getElementById(config.inputId);
+			const trigger = document.getElementById(config.triggerId);
+			const panel = document.getElementById(config.panelId);
+			if (!box || !inputEl || !trigger || !panel) return;
+
+			// portal：面板移出模块卡片挂到 body 下，脱离 backdrop-filter 创建的层叠上下文
+			if (panel.parentElement !== document.body) {
+				document.body.appendChild(panel);
+			}
+
+			const items = Array.prototype.slice.call(panel.querySelectorAll('.proxyip-picker-item'));
+			const PANEL_GAP = 6;         // 面板与输入框的垂直间距
+			const MIN_SPACE = 8;         // 翻转判定的安全余量
+			const WIDE_BREAKPOINT = 420; // 输入框宽度 ≥ 此值时面板切换单行排版
+			let rafId = 0;
+			let repositionHandler = null;
+
+			// 依据输入框位置计算面板 fixed 坐标（等宽等位，正下方 6px）；
+			// 下方剩余空间不足且上方更大时翻转到输入框上方。
+			// 面板收起时 visibility:hidden 但布局保留，offsetHeight 仍可测量：
+			// 先定位（含切换 wide 排版后测高）再展开，避免闪烁
+			function positionPanel() {
+				const rect = box.getBoundingClientRect();
+				// 视口钳制：防移动端横向溢出（视口左右各留 8px）
+				const maxW = document.documentElement.clientWidth - 16;
+				let width = Math.min(rect.width, maxW);
+				let left = rect.left;
+				if (left + width > maxW) left = Math.max(8, maxW - width);
+				// 宽面板单行排版开关（先切排版再测高，保证高度测量准确）
+				panel.classList.toggle('proxyip-picker-wide', rect.width >= WIDE_BREAKPOINT);
+				panel.style.left = Math.round(left) + 'px';
+				panel.style.width = Math.round(width) + 'px';
+				const panelH = panel.offsetHeight;
+				const spaceBelow = window.innerHeight - rect.bottom;
+				const spaceAbove = rect.top;
+				// 翻转策略：下方放得下 → 下方；否则上方放得下 → 上方；
+				// 两侧都不足（窄屏挤压）→ 选空间更大的一侧，再由下方钳制兜底
+				const flip = (spaceBelow >= panelH + MIN_SPACE)
+					? false
+					: (spaceAbove >= panelH + MIN_SPACE || spaceAbove > spaceBelow);
+				panel.classList.toggle('proxyip-picker-panel-flip', flip);
+				let top = flip ? rect.top - PANEL_GAP - panelH : rect.bottom + PANEL_GAP;
+				// 视口兜底钳制：任何情况下不越过视口上下缘（各留 8px 边距）
+				const maxTop = window.innerHeight - 8 - panelH;
+				top = Math.min(Math.max(top, 8), Math.max(8, maxTop));
+				panel.style.top = Math.round(top) + 'px';
+			}
+
+			// 打开期间实时跟随：捕获各层滚动 + 窗口缩放，rAF 节流重定位；关闭时解绑
+			function startFollow() {
+				if (repositionHandler) return;
+				repositionHandler = function () {
+					if (rafId) return;
+					rafId = requestAnimationFrame(function () {
+						rafId = 0;
+						positionPanel();
+					});
+				};
+				document.addEventListener('scroll', repositionHandler, true);
+				window.addEventListener('resize', repositionHandler);
+			}
+
+			function stopFollow() {
+				if (repositionHandler) {
+					document.removeEventListener('scroll', repositionHandler, true);
+					window.removeEventListener('resize', repositionHandler);
+					repositionHandler = null;
+				}
+				if (rafId) {
+					cancelAnimationFrame(rafId);
+					rafId = 0;
+				}
+			}
+
+			// 关闭面板并复位容器/面板的显隐 class 与触发按钮 aria 状态
+			function closePicker() {
+				box.classList.remove('proxyip-picker-open');
+				panel.classList.remove('proxyip-picker-panel-open');
+				trigger.setAttribute('aria-expanded', 'false');
+				stopFollow();
+			}
+
+			// 打开面板：先关掉另一个 ECH 面板（PROXYIP 面板由 document 外点关闭，此处不动它的逻辑）
+			function openPicker() {
+				Object.keys(ECH_PICKER_CLOSERS).forEach(function (key) {
+					if (key !== config.kind) ECH_PICKER_CLOSERS[key]();
+				});
+				const current = inputEl.value.trim();
+				syncEchPresetPanelSelection(config.panelId, current, config.kind === 'sni' && current === '');
+				// 先定位（面板尚不可见）再展开，最后挂跟随监听
+				positionPanel();
+				box.classList.add('proxyip-picker-open');
+				panel.classList.add('proxyip-picker-panel-open');
+				trigger.setAttribute('aria-expanded', 'true');
+				startFollow();
+			}
+
+			// 触发按钮点击开合（面板已 portal 到 body，外点关闭走包含性判断，无需 stopPropagation）
+			trigger.addEventListener('click', function () {
+				if (panel.classList.contains('proxyip-picker-panel-open')) {
+					closePicker();
+				} else {
+					openPicker();
+				}
+			});
+
+			// 面板条目点击走统一选中流程
+			panel.addEventListener('click', function (e) {
+				const item = e.target.closest('.proxyip-picker-item');
+				if (item) selectEchPresetItem(config.kind, item);
+			});
+
+			// 键盘导航：↑/↓ 在条目间移动焦点，Esc 关闭并还焦点，Tab 关闭。
+			// Enter/Space 由原生 button click 行为触发选中，无需额外处理。
+			function pickerKeydown(e) {
+				if (!panel.classList.contains('proxyip-picker-panel-open')) return;
+				if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+					e.preventDefault();
+					if (!items.length) return;
+					const index = items.indexOf(document.activeElement);
+					let next;
+					if (index === -1) {
+						next = items[0];
+					} else if (e.key === 'ArrowDown') {
+						next = items[(index + 1) % items.length];
+					} else {
+						next = items[(index - 1 + items.length) % items.length];
+					}
+					if (next) next.focus();
+				} else if (e.key === 'Escape') {
+					e.preventDefault();
+					closePicker();
+					trigger.focus(); // 焦点还给触发按钮
+				} else if (e.key === 'Tab') {
+					closePicker();
+				}
+			}
+			box.addEventListener('keydown', pickerKeydown);
+			panel.addEventListener('keydown', pickerKeydown);
+
+			// 点击面板与输入框容器之外的空白处：关闭面板（包含性判断）
+			document.addEventListener('click', function (e) {
+				if (!panel.classList.contains('proxyip-picker-panel-open')) return;
+				if (panel.contains(e.target) || box.contains(e.target)) return;
+				closePicker();
+			});
+
+			// Esc 全局兜底：焦点不在面板/容器内（如停留在页面其他位置）时也能关闭
+			document.addEventListener('keydown', function (e) {
+				if (e.key !== 'Escape') return;
+				if (!panel.classList.contains('proxyip-picker-panel-open')) return;
+				if (panel.contains(document.activeElement) || box.contains(document.activeElement)) return;
+				closePicker();
+			});
+
+			// 注册关闭函数：供「同一时刻只开一个面板」与选中流程复用
+			ECH_PICKER_CLOSERS[config.kind] = closePicker;
+		}
+
+		// 初始化 ECH 的两个预设下拉（DOMContentLoaded 时调用一次）
+		function initEchPresetPickers() {
+			renderEchPresetPanel(document.getElementById('echDNSPresetPanel'), ECH_DNS_PRESET_GROUPS, ECH_DNS_PANEL_FOOT);
+			renderEchPresetPanel(document.getElementById('echSNIPresetPanel'), ECH_SNI_PRESET_GROUPS, ECH_SNI_PANEL_FOOT);
+
+			setupEchPresetPicker({
+				kind: 'dns',
+				groupId: 'echDNSGroup',
+				inputId: 'echDNSInput',
+				triggerId: 'echDNSPresetTrigger',
+				panelId: 'echDNSPresetPanel'
+			});
+			setupEchPresetPicker({
+				kind: 'sni',
+				groupId: 'echSNIGroup',
+				inputId: 'echSNIInput',
+				triggerId: 'echSNIPresetTrigger',
+				panelId: 'echSNIPresetPanel'
+			});
+
+			// 初始为「自动获取」态（文本框空 + 灰色占位说明），配置加载后由 populate 覆盖
+			setEchSNIFieldValue('', { skipMarkModified: true });
+		}
+
+		// 「启用自动获取」勾选时，文本框不显示 auto，改为显示说明文案（提交时仍为 auto）
+		const PROXYIP_DEFAULT_PLACEHOLDER = 'ProxyIP.CMLiussss.net';
+		const PROXYIP_AUTO_PLACEHOLDER = '当前正在使用官方PROXYIP，但香港地区会分配新加坡的第三方PROXYIP。';
+
+		// 按「启用自动获取」的勾选状态同步文本框的占位提示
+		function applyProxyIPAutoDisplay() {
+			const inputEl = document.getElementById('proxyIP');
+			const autoProxyEl = document.getElementById('autoProxy');
+			if (!inputEl) return;
+
+			const isAuto = !!(autoProxyEl && autoProxyEl.checked);
+			if (isAuto) {
+				// 勾选状态不显示 auto 字样：清空值，用说明文案当占位
+				inputEl.value = '';
+				inputEl.placeholder = PROXYIP_AUTO_PLACEHOLDER;
+			} else {
+				inputEl.placeholder = PROXYIP_DEFAULT_PLACEHOLDER;
+			}
+			inputEl.classList.toggle('proxyip-auto-mode', isAuto);
+		}
+
+		// ========== PROXYIP 预设下拉（自绘面板，替代原生 select） ==========
+		// 初始化：把面板 portal 到 body 下（根治模块卡片 backdrop-filter 层叠上下文遮挡），
+		// 绑定触发按钮开合、JS fixed 定位与滚动跟随、面板条目选中、外点关闭与键盘导航
+		function initProxyIPPresetPicker() {
+			const box = document.querySelector('.proxyip-input-box');
+			if (!box) return;
+			const trigger = box.querySelector('.proxyip-picker-trigger');
+			const panel = document.getElementById('proxyIPPresetPanel');
+			const inputEl = document.getElementById('proxyIP');
+			if (!trigger || !panel || !inputEl) return;
+
+			// portal：面板移出模块卡片挂到 body 下，脱离 backdrop-filter 创建的层叠上下文
+			if (panel.parentElement !== document.body) {
+				document.body.appendChild(panel);
+			}
+
+			const items = Array.from(panel.querySelectorAll('.proxyip-picker-item'));
+			const PANEL_GAP = 6;         // 面板与输入框的垂直间距
+			const MIN_SPACE = 8;         // 翻转判定的安全余量
+			const WIDE_BREAKPOINT = 420; // 输入框宽度 ≥ 此值时面板切换单行排版
+			let rafId = 0;
+			let repositionHandler = null;
+
+			// 依据输入框位置计算面板 fixed 坐标（等宽等位，正下方 6px）；
+			// 下方剩余空间不足且上方更大时翻转到输入框上方。
+			// 面板收起时 visibility:hidden 但布局保留，offsetHeight 仍可测量：
+			// 先定位（含切换 wide 排版后测高）再展开，避免闪烁
+			function positionPanel() {
+				const rect = box.getBoundingClientRect();
+				// 视口钳制：防移动端横向溢出（视口左右各留 8px）
+				const maxW = document.documentElement.clientWidth - 16;
+				let width = Math.min(rect.width, maxW);
+				let left = rect.left;
+				if (left + width > maxW) left = Math.max(8, maxW - width);
+				// 宽面板单行排版开关（先切排版再测高，保证高度测量准确）
+				panel.classList.toggle('proxyip-picker-wide', rect.width >= WIDE_BREAKPOINT);
+				panel.style.left = Math.round(left) + 'px';
+				panel.style.width = Math.round(width) + 'px';
+				const panelH = panel.offsetHeight;
+				const spaceBelow = window.innerHeight - rect.bottom;
+				const spaceAbove = rect.top;
+				// 翻转策略：下方放得下 → 下方；否则上方放得下 → 上方；
+				// 两侧都不足（窄屏挤压）→ 选空间更大的一侧，再由下方钳制兜底
+				const flip = (spaceBelow >= panelH + MIN_SPACE)
+					? false
+					: (spaceAbove >= panelH + MIN_SPACE || spaceAbove > spaceBelow);
+				panel.classList.toggle('proxyip-picker-panel-flip', flip);
+				let top = flip ? rect.top - PANEL_GAP - panelH : rect.bottom + PANEL_GAP;
+				// 视口兜底钳制：任何情况下不越过视口上下缘（各留 8px 边距）
+				const maxTop = window.innerHeight - 8 - panelH;
+				top = Math.min(Math.max(top, 8), Math.max(8, maxTop));
+				panel.style.top = Math.round(top) + 'px';
+			}
+
+			// 打开期间实时跟随：捕获各层滚动 + 窗口缩放，rAF 节流重定位；关闭时解绑
+			function startFollow() {
+				if (repositionHandler) return;
+				repositionHandler = function () {
+					if (rafId) return;
+					rafId = requestAnimationFrame(function () {
+						rafId = 0;
+						positionPanel();
+					});
+				};
+				document.addEventListener('scroll', repositionHandler, true);
+				window.addEventListener('resize', repositionHandler);
+			}
+
+			function stopFollow() {
+				if (repositionHandler) {
+					document.removeEventListener('scroll', repositionHandler, true);
+					window.removeEventListener('resize', repositionHandler);
+					repositionHandler = null;
+				}
+				if (rafId) {
+					cancelAnimationFrame(rafId);
+					rafId = 0;
+				}
+			}
+
+			// 关闭面板并复位容器/面板的显隐 class 与触发按钮 aria 状态
+			function closePicker() {
+				box.classList.remove('proxyip-picker-open');
+				panel.classList.remove('proxyip-picker-panel-open');
+				trigger.setAttribute('aria-expanded', 'false');
+				stopFollow();
+			}
+
+			// 打开面板：同步选中态（输入框 value 由加载/保存逻辑控制，此处只读不改写）
+			function openPicker() {
+				// 同一时间只保留一个打开的 PROXYIP 下拉
+				document.querySelectorAll('.proxyip-input-box.proxyip-picker-open').forEach(function (other) {
+					if (other !== box) {
+						other.classList.remove('proxyip-picker-open');
+						const otherTrigger = other.querySelector('.proxyip-picker-trigger');
+						if (otherTrigger) otherTrigger.setAttribute('aria-expanded', 'false');
+					}
+				});
+				// 按 data-domain 匹配输入框当前值；无匹配（含初始为空）时保持「自动全球」推荐态
+				const current = inputEl.value.trim().toLowerCase();
+				let matched = false;
+				items.forEach(function (item) {
+					const hit = item.getAttribute('data-domain').toLowerCase() === current;
+					item.classList.toggle('is-selected', hit);
+					item.setAttribute('aria-selected', hit ? 'true' : 'false');
+					if (hit) matched = true;
+				});
+				if (!matched) {
+					const first = items[0];
+					if (first) {
+						first.classList.add('is-selected');
+						first.setAttribute('aria-selected', 'true');
 					}
 				}
-			} else {
-				// 没有保存值，默认选择"自定义"
-				select.value = 'custom';
-				customInput.style.display = 'block';
-			}
-		}
-
-		// ECH DNS select 变化处理
-		function onEchDNSSelectChange() {
-			const select = document.getElementById('echDNSSelect');
-			const customInput = document.getElementById('echDNSCustomInput');
-			const hiddenValue = document.getElementById('echDNSValue');
-
-			if (select.value === 'custom') {
-				customInput.style.display = 'block';
-				hiddenValue.value = customInput.value;
-			} else {
-				customInput.style.display = 'none';
-				customInput.value = '';
-				hiddenValue.value = select.value;
+				// 先定位（面板尚不可见）再展开，最后挂跟随监听
+				positionPanel();
+				box.classList.add('proxyip-picker-open');
+				panel.classList.add('proxyip-picker-panel-open');
+				trigger.setAttribute('aria-expanded', 'true');
+				startFollow();
 			}
 
-			// 检查是否选择了国内DNS，若是则自动调整ECH解析域名
-			const selectedOption = select.options[select.selectedIndex];
-			const region = selectedOption.dataset.region;
+			// 触发按钮点击开合（面板已 portal 到 body，外点关闭走包含性判断，无需 stopPropagation）
+			trigger.addEventListener('click', function () {
+				if (panel.classList.contains('proxyip-picker-panel-open')) {
+					closePicker();
+				} else {
+					openPicker();
+				}
+			});
 
-			if (region === 'domestic') {
-				const echSNISelect = document.getElementById('echSNISelect');
-				// 如果当前选择是 __AUTO__，自动改为 cloudflare-ech.com
-				if (echSNISelect.value === '__AUTO__') {
-					echSNISelect.value = 'cloudflare-ech.com';
-					onEchSNISelectChange();
+			// 面板条目点击走统一选中流程
+			panel.addEventListener('click', function (e) {
+				const item = e.target.closest('.proxyip-picker-item');
+				if (item) {
+					selectProxyIPPreset(item);
+				}
+			});
+
+			// 键盘导航：↑/↓ 在条目间移动焦点，Esc/Tab 关闭
+			// Enter/Space 由原生 button click 行为触发选中，无需额外处理。
+			// 面板已 portal 到 body，监听须同时挂在输入框容器与面板上（原依赖事件冒泡到 box）
+			function pickerKeydown(e) {
+				if (!panel.classList.contains('proxyip-picker-panel-open')) return;
+				if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+					e.preventDefault();
+					const index = items.indexOf(document.activeElement);
+					let next;
+					if (index === -1) {
+						next = items[0];
+					} else if (e.key === 'ArrowDown') {
+						next = items[(index + 1) % items.length];
+					} else {
+						next = items[(index - 1 + items.length) % items.length];
+					}
+					if (next) next.focus();
+				} else if (e.key === 'Escape') {
+					e.preventDefault();
+					closePicker();
+					trigger.focus(); // 焦点还给触发按钮
+				} else if (e.key === 'Tab') {
+					closePicker();
 				}
 			}
+			box.addEventListener('keydown', pickerKeydown);
+			panel.addEventListener('keydown', pickerKeydown);
 
-			markModified('ech');
+			// 点击面板与输入框容器之外的空白处：关闭面板（包含性判断，替代原面板内 stopPropagation 方案）
+			document.addEventListener('click', function (e) {
+				if (!panel.classList.contains('proxyip-picker-panel-open')) return;
+				if (panel.contains(e.target) || box.contains(e.target)) return;
+				closePicker();
+			});
+
+			// Esc 全局兜底：焦点不在面板/容器内（如停留在页面其他位置）时也能关闭；
+			// 面板内与容器内的 Esc 已由上方 pickerKeydown 处理并归还焦点
+			document.addEventListener('keydown', function (e) {
+				if (e.key !== 'Escape') return;
+				if (!panel.classList.contains('proxyip-picker-panel-open')) return;
+				if (panel.contains(document.activeElement) || box.contains(document.activeElement)) return;
+				closePicker();
+			});
+
+			// 供全局函数 selectProxyIPPreset 复用关闭逻辑（含跟随监听解绑）
+			panel.__proxyipClose = closePicker;
 		}
 
-		// ECH DNS 自定义输入框变化处理
-		function onEchDNSCustomInput() {
-			const customInput = document.getElementById('echDNSCustomInput');
-			const hiddenValue = document.getElementById('echDNSValue');
-			hiddenValue.value = customInput.value;
-			markModified('ech');
-		}
+		// 选中某个 PROXYIP 预设条目：更新选中态、回填输入框并复用 change 流程
+		function selectProxyIPPreset(item) {
+			const panel = item.closest('.proxyip-picker-panel');
+			const inputEl = document.getElementById('proxyIP');
+			if (!item || !panel || !inputEl) return;
+			// 面板已 portal 到 body，item.closest('.proxyip-input-box') 不再可达，
+			// 改由触发按钮 id 反查所在容器
+			const trigger = document.getElementById('proxyIPPresetTrigger');
+			const box = trigger ? trigger.closest('.proxyip-input-box') : null;
 
-		// ECH SNI select 变化处理
-		function onEchSNISelectChange() {
-			const select = document.getElementById('echSNISelect');
-			const customInput = document.getElementById('echSNICustomInput');
-			const hiddenValue = document.getElementById('echSNIValue');
+			// 更新面板内选中态（对勾 + aria-selected）
+			panel.querySelectorAll('.proxyip-picker-item').forEach(function (i) {
+				i.classList.remove('is-selected');
+				i.setAttribute('aria-selected', 'false');
+			});
+			item.classList.add('is-selected');
+			item.setAttribute('aria-selected', 'true');
 
-			if (select.value === '__AUTO__') {
-				customInput.style.display = 'none';
-				customInput.value = '';
-				hiddenValue.value = null;
+			// 回填输入框并复用输入框现有 change 流程：
+			// 规范化地址（processProxyIP）、退出自动获取、markModified('proxy')
+			const domain = item.getAttribute('data-domain') || '';
+			if (domain) {
+				inputEl.value = domain;
+				inputEl.dispatchEvent(new Event('change', { bubbles: true }));
 
-				// 检查当前DNS服务是否为国内DNS
-				const echDNSSelect = document.getElementById('echDNSSelect');
-				const selectedDNSOption = echDNSSelect.options[echDNSSelect.selectedIndex];
-				const dnsRegion = selectedDNSOption.dataset.region;
-
-				if (dnsRegion === 'domestic') {
-					alert('⚠️ ECH 配置提示\n\n默认使用节点HOST伪装域名 配合 国内 DNS 可能导致 ECH 解析失败。\n\n解决方案（任选其一）：\n① 将 ECH 解析域名改为 cloudflare-ech.com（推荐）\n② 将 ECH DNS 切换为国际服务（如 NextDNS）');
-					select.value = 'cloudflare-ech.com';
-				}
-			} else if (select.value === 'custom') {
-				customInput.style.display = 'block';
-				hiddenValue.value = customInput.value;
-			} else {
-				customInput.style.display = 'none';
-				customInput.value = '';
-				hiddenValue.value = select.value;
+				// 选中反馈：输入框文字短暂染上琥珀色（约 900ms）
+				inputEl.classList.add('proxyip-picker-flash');
+				setTimeout(function () {
+					inputEl.classList.remove('proxyip-picker-flash');
+				}, 900);
 			}
-			markModified('ech');
-		}
 
-		// ECH SNI 自定义输入框变化处理
-		function onEchSNICustomInput() {
-			const customInput = document.getElementById('echSNICustomInput');
-			const hiddenValue = document.getElementById('echSNIValue');
-			hiddenValue.value = customInput.value;
-			markModified('ech');
+			// 关闭面板（复用初始化闭包的关闭逻辑，含跟随监听解绑）并把焦点还给触发按钮
+			if (typeof panel.__proxyipClose === 'function') {
+				panel.__proxyipClose();
+			} else if (box) {
+				box.classList.remove('proxyip-picker-open');
+			}
+			if (trigger) trigger.focus();
 		}
 
 		// 处理PROXYIP地址
 		function processProxyIP() {
-			const input = document.getElementById('proxyIP').value.trim();
+			const inputEl = document.getElementById('proxyIP');
+			const input = inputEl.value.trim();
 
 			if (input && input !== 'auto') {
 				const cleanAddress = extractProxyIPAddress(input);
-				document.getElementById('proxyIP').value = cleanAddress;
+				inputEl.value = cleanAddress;
+
+				// 手动填写或点选预设即退出「启用自动获取」，否则保存时会被 auto 覆盖
+				const autoProxyEl = document.getElementById('autoProxy');
+				if (autoProxyEl && autoProxyEl.checked) {
+					autoProxyEl.checked = false;
+				}
+
+				// 退出自动模式后恢复正常占位提示
+				inputEl.placeholder = PROXYIP_DEFAULT_PLACEHOLDER;
+				inputEl.classList.remove('proxyip-auto-mode');
 			}
 
 			markModified('proxy');
@@ -21575,17 +23333,13 @@
 				if (isProxyIPMode) {
 					document.getElementById('proxyIP').value = currentConfig.反代?.PROXYIP || '';
 					document.getElementById('autoProxy').checked = (currentConfig.反代?.PROXYIP === 'auto');
-					document.getElementById('proxyIP').disabled = (currentConfig.反代?.PROXYIP === 'auto');
 				} else {
 					populateProxyProtocolFromConfig(mode);
 				}
 			}
 
-			// 更新 "获取更多PROXYIP" 按钮的显示状态
-			const getMoreBtn = document.getElementById('getMoreProxyIPBtn');
-			if (getMoreBtn) {
-				getMoreBtn.style.display = isProxyIPMode ? 'inline-block' : 'none';
-			}
+			// 「启用自动获取」勾选时文本框显示说明文案而非 auto
+			applyProxyIPAutoDisplay();
 
 			// 更新 "路径模板配置" 按钮的显示状态
 			const pathTemplateConfigBtn = document.getElementById('pathTemplateConfigBtn');
@@ -21600,8 +23354,8 @@
 		}
 
 		function toggleAutoProxy() {
-			const autoProxy = document.getElementById('autoProxy').checked;
-			document.getElementById('proxyIP').disabled = autoProxy;
+			// PROXYIP 输入框始终可编辑，勾选/取消「启用自动获取」不再禁用文本框
+			applyProxyIPAutoDisplay();
 			markModified('proxy');
 		}
 
@@ -21994,6 +23748,343 @@
 			updateALPNGroupVisibility();
 		}
 
+		// ===== 连接复用（XHTTP xmux 参数）相关处理 =====
+		// 取 currentConfig['连接复用']，不存在或非对象时返回 null
+		function getXmuxConfig() {
+			if (!currentConfig || typeof currentConfig !== 'object') return null;
+			const xmuxConfig = currentConfig['连接复用'];
+			if (!xmuxConfig || typeof xmuxConfig !== 'object' || Array.isArray(xmuxConfig)) return null;
+			return xmuxConfig;
+		}
+
+		// 解析单个参数：支持整数或「min-max」范围写法，返回 { ok, value, message }
+		// value 为 number 或 "min-max" 字符串，直接对应后端 xmux 字段类型
+		function parseXmuxFieldValue(rawValue, key) {
+			const meta = XMUX_FIELD_META[key];
+			if (!meta) return { ok: true, value: 0 };
+			const text = String(rawValue === null || rawValue === undefined ? '' : rawValue).trim();
+			if (!text) return { ok: true, value: 0 };
+
+			if (/^[+-]?\d+$/.test(text)) {
+				let parsed = parseInt(text, 10);
+				if (!Number.isFinite(parsed)) return { ok: true, value: 0 };
+				if (!meta.allowNegative && parsed < 0) return { ok: false, message: '不能填负数' };
+				if (parsed > XMUX_INT_MAX) parsed = XMUX_INT_MAX;
+				if (parsed < XMUX_INT_MIN) parsed = XMUX_INT_MIN;
+				return { ok: true, value: parsed };
+			}
+
+			if (!meta.allowRange) return { ok: false, message: '只支持整数，不支持范围' };
+
+			const rangeMatch = text.match(/^(\d+)\s*-\s*(\d+)$/);
+			if (!rangeMatch) return { ok: false, message: '请填整数或范围，如 16-32' };
+			let rangeMin = Math.min(parseInt(rangeMatch[1], 10), XMUX_INT_MAX);
+			let rangeMax = Math.min(parseInt(rangeMatch[2], 10), XMUX_INT_MAX);
+			if (!Number.isFinite(rangeMin) || !Number.isFinite(rangeMax)) {
+				return { ok: false, message: '请填整数或范围，如 16-32' };
+			}
+			if (rangeMax < rangeMin) return { ok: false, message: '范围结束值需不小于起始值' };
+			if (rangeMin === rangeMax) return { ok: true, value: rangeMin };
+			return { ok: true, value: `${rangeMin}-${rangeMax}` };
+		}
+
+		// 该值是否算「已设置」：数字 > 0，或范围的上限 > 0
+		function isXmuxValueSet(value) {
+			if (typeof value === 'number') return value > 0;
+			if (typeof value === 'string') {
+				const parts = value.split('-');
+				const rangeMax = parseInt(parts[parts.length - 1], 10);
+				return Number.isFinite(rangeMax) && rangeMax > 0;
+			}
+			return false;
+		}
+
+		// 字段级错误提示：传空字符串即清除
+		function setXmuxFieldError(key, message) {
+			const meta = XMUX_FIELD_META[key];
+			if (!meta) return;
+			const field = document.getElementById(meta.fieldId);
+			const input = document.getElementById(meta.inputId);
+			const errorEl = document.getElementById(meta.errorId);
+			if (message) {
+				if (field) field.classList.add('is-invalid');
+				if (input) input.setAttribute('aria-invalid', 'true');
+				if (errorEl) errorEl.textContent = message;
+				return;
+			}
+			if (field) field.classList.remove('is-invalid');
+			if (input) input.removeAttribute('aria-invalid');
+			if (errorEl) errorEl.textContent = '';
+		}
+
+		// 显隐判定：版本达标 + 连接复用字段存在 + 传输协议为 xhttp + 传输协议组本身可见
+		function isXmuxRowVisible() {
+			if (!xmuxFeatureEnabled) return false;
+			const transportGroup = document.getElementById('transportGroup');
+			const transportSelect = document.getElementById('transport');
+			if (!transportGroup || !transportSelect) return false;
+			if (transportGroup.style.display === 'none') return false;
+			if (!getXmuxConfig()) return false;
+			return transportSelect.value === 'xhttp';
+		}
+
+		// 只负责刷新「连接复用」这一行的显隐
+		function syncXmuxRowVisibility() {
+			const xmuxRow = document.getElementById('xmuxRow');
+			if (!xmuxRow) return;
+			// 可见时清掉内联 display，交回 .module .form-group 的网格布局（勾选框才能与上方输入框左沿对齐）
+			if (isXmuxRowVisible()) {
+				xmuxRow.style.removeProperty('display');
+			} else {
+				xmuxRow.style.setProperty('display', 'none', 'important');
+			}
+		}
+
+		// 同步「启用」勾选状态 + 刷新显隐（renderUI / cancelEdit / 版本号到位后共用）
+		function syncXmuxFromConfig() {
+			const xmuxEnabledCheckbox = document.getElementById('xmuxEnabled');
+			const xmuxConfig = getXmuxConfig();
+			if (xmuxEnabledCheckbox) {
+				xmuxEnabledCheckbox.checked = !!(xmuxConfig && xmuxConfig['启用']);
+			}
+			syncXmuxRowVisibility();
+		}
+
+		// 勾选「启用」：只写 currentConfig 并标记 config 模块已修改，不直接提交
+		function handleXmuxEnabledChange(event) {
+			const checkbox = (event && event.target) ? event.target : document.getElementById('xmuxEnabled');
+			const xmuxConfig = getXmuxConfig();
+			if (!checkbox || !xmuxConfig) return;
+			xmuxConfig['启用'] = !!checkbox.checked;
+			markModified('config');
+		}
+
+		function getXmuxFieldElement(key) {
+			const meta = XMUX_FIELD_META[key];
+			if (!meta) return null;
+			return document.getElementById(meta.fieldId);
+		}
+
+		function clearXmuxConflictHighlight(fieldElement) {
+			if (!fieldElement) return;
+			fieldElement.classList.remove('is-conflict');
+		}
+
+		// 被归零的字段闪一下，提示用户该值被自动改动
+		function flashXmuxConflictHighlight(fieldElement) {
+			if (!fieldElement) return;
+			fieldElement.classList.remove('is-conflict');
+			// 强制回流，保证连续触发时动画能重新播放
+			void fieldElement.offsetWidth;
+			fieldElement.classList.add('is-conflict');
+			setTimeout(() => {
+				fieldElement.classList.remove('is-conflict');
+			}, 900);
+		}
+
+		// 用 currentConfig 里的当前值重新填充弹窗表单（打开时与关闭时都走这里）
+		function fillXmuxFormFromConfig() {
+			const xmuxConfig = getXmuxConfig();
+			const xmuxValues = (xmuxConfig && xmuxConfig.xmux && typeof xmuxConfig.xmux === 'object') ? xmuxConfig.xmux : {};
+			XMUX_FIELD_KEYS.forEach((key) => {
+				const meta = XMUX_FIELD_META[key];
+				clearXmuxConflictHighlight(getXmuxFieldElement(key));
+				const input = document.getElementById(meta.inputId);
+				if (!input) return;
+				setXmuxFieldError(key, '');
+				const rawValue = xmuxValues[key];
+				input.value = (rawValue === null || rawValue === undefined || rawValue === '') ? '0' : String(rawValue);
+			});
+		}
+
+		function openXmuxModal() {
+			const modal = document.getElementById('xmuxModal');
+			if (!modal) return;
+			if (!getXmuxConfig()) {
+				showToast('😢 当前后端版本不支持连接复用设置', 'error');
+				return;
+			}
+			fillXmuxFormFromConfig();
+			modal.classList.add('show');
+		}
+
+		// 关闭入口（×、遮罩、取消）：不写任何字段、不发请求，只把表单还原成 currentConfig 的当前值
+		function closeXmuxModal(event) {
+			if (event && event.target && event.target.id !== 'xmuxModal') return;
+			const modal = document.getElementById('xmuxModal');
+			if (!modal) return;
+			modal.classList.remove('show');
+			fillXmuxFormFromConfig();
+		}
+
+		// 互斥约束：maxConnections 与 maxConcurrency 不能同时设置，后改的生效、另一个归零
+		function enforceXmuxMutualExclusion(key) {
+			if (key !== 'maxConnections' && key !== 'maxConcurrency') return;
+			const pairKey = key === 'maxConnections' ? 'maxConcurrency' : 'maxConnections';
+			const pairMeta = XMUX_FIELD_META[pairKey];
+			const pairInput = document.getElementById(pairMeta.inputId);
+			if (!pairInput) return;
+			const parsed = parseXmuxFieldValue(pairInput.value, pairKey);
+			if (!parsed.ok || !isXmuxValueSet(parsed.value)) return;
+			pairInput.value = '0';
+			setXmuxFieldError(pairKey, '');
+			flashXmuxConflictHighlight(getXmuxFieldElement(pairKey));
+		}
+
+		// input 事件：只做互斥联动与错误清除，不改写用户正在输入的内容
+		function handleXmuxFieldInput(event, key) {
+			const input = (event && event.target) ? event.target : null;
+			if (!input || !XMUX_FIELD_META[key]) return;
+			const parsed = parseXmuxFieldValue(input.value, key);
+			if (!parsed.ok) return;
+			setXmuxFieldError(key, '');
+			if (isXmuxValueSet(parsed.value)) enforceXmuxMutualExclusion(key);
+		}
+
+		// change 事件：合法则规范化写法（" 16 - 32 " → "16-32"），非法则标红提示、保留原文供修改
+		function handleXmuxFieldCommit(event, key) {
+			const input = (event && event.target) ? event.target : null;
+			if (!input || !XMUX_FIELD_META[key]) return;
+			const parsed = parseXmuxFieldValue(input.value, key);
+			if (!parsed.ok) {
+				setXmuxFieldError(key, parsed.message);
+				return;
+			}
+			setXmuxFieldError(key, '');
+			input.value = String(parsed.value);
+			if (isXmuxValueSet(parsed.value)) enforceXmuxMutualExclusion(key);
+		}
+
+		// 收集并校验全部字段；firstInvalidKey 非空表示存在格式错误
+		function collectXmuxFormValues() {
+			const values = {};
+			let firstInvalidKey = null;
+			XMUX_FIELD_KEYS.forEach((key) => {
+				const meta = XMUX_FIELD_META[key];
+				const input = document.getElementById(meta.inputId);
+				const parsed = parseXmuxFieldValue(input ? input.value : '', key);
+				if (!parsed.ok) {
+					setXmuxFieldError(key, parsed.message);
+					if (!firstInvalidKey) firstInvalidKey = key;
+					return;
+				}
+				setXmuxFieldError(key, '');
+				values[key] = parsed.value;
+			});
+			return { values, firstInvalidKey };
+		}
+
+		// 保存中禁用三个按钮，防止重复提交
+		function setXmuxButtonsBusy(busy) {
+			['xmuxResetBtn', 'xmuxCancelBtn', 'xmuxSaveBtn'].forEach((id) => {
+				const button = document.getElementById(id);
+				if (button) button.disabled = !!busy;
+			});
+		}
+
+		// 保存：表单 -> 校验 -> currentConfig['连接复用'].xmux -> 立即 POST 整个配置
+		async function saveXmuxSettings() {
+			if (xmuxSaving) return;
+			const xmuxConfig = getXmuxConfig();
+			if (!xmuxConfig) {
+				showToast('😢 当前后端版本不支持连接复用设置', 'error');
+				return;
+			}
+
+			const collected = collectXmuxFormValues();
+			if (collected.firstInvalidKey) {
+				showToast('😢 有参数格式不正确，请检查标红的输入框', 'error');
+				const invalidInput = document.getElementById(XMUX_FIELD_META[collected.firstInvalidKey].inputId);
+				if (invalidInput) invalidInput.focus();
+				return;
+			}
+			const nextValues = collected.values;
+			// 互斥：任一字段「已设置」即算占用（数字 > 0，或范围上限 > 0）
+			if (isXmuxValueSet(nextValues.maxConnections) && isXmuxValueSet(nextValues.maxConcurrency)) {
+				showToast('😢 「最大连接数」与「最大并发数」不能同时设置，请把其中一个改成 0', 'error');
+				return;
+			}
+
+			const previousXmux = (xmuxConfig.xmux && typeof xmuxConfig.xmux === 'object')
+				? JSON.parse(JSON.stringify(xmuxConfig.xmux))
+				: null;
+
+			xmuxSaving = true;
+			setXmuxButtonsBusy(true);
+			xmuxConfig.xmux = Object.assign({}, previousXmux || {}, nextValues);
+
+			// 传输协议此刻可能只改在 DOM 里（模块尚未保存），这里按 saveConfig() 同语义回写一次，
+			// 否则会出现「传输协议=ws 且 连接复用.启用=true」这种服务端不会生效的自相矛盾配置
+			const hasTransportField = currentConfig['传输协议'] !== undefined;
+			const transportGroupEl = document.getElementById('transportGroup');
+			const transportSelectEl = document.getElementById('transport');
+			const shouldSyncTransport = hasTransportField
+				&& !!transportGroupEl
+				&& !!transportSelectEl
+				&& transportGroupEl.style.display !== 'none';
+			const previousTransport = hasTransportField ? currentConfig['传输协议'] : undefined;
+			let transportSynced = false;
+			if (shouldSyncTransport) {
+				currentConfig['传输协议'] = transportSelectEl.value;
+				transportSynced = true;
+			}
+
+			try {
+				const response = await fetch('/admin/config.json', {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json',
+						'Cache-Control': 'no-cache, no-store, must-revalidate',
+						'Pragma': 'no-cache',
+						'Expires': '0'
+					},
+					body: JSON.stringify(currentConfig)
+				});
+
+				if (!response.ok) throw new Error('保存失败');
+
+				// 已落盘：同步基准配置，避免之后点模块「取消」把已保存的值回滚成旧值
+				originalConfig['连接复用'] = JSON.parse(JSON.stringify(xmuxConfig));
+				if (transportSynced) {
+					originalConfig['传输协议'] = currentConfig['传输协议'];
+				}
+				closeXmuxModal();
+				showToast('✅ 连接复用设置已保存，请更新订阅，才能获取最新节点内容！', 'success');
+			} catch (error) {
+				// 未落盘：回滚内存中的 xmux 与传输协议，弹窗保持打开，用户已输入的内容仍留在表单里
+				if (previousXmux) {
+					xmuxConfig.xmux = previousXmux;
+				} else {
+					delete xmuxConfig.xmux;
+				}
+				if (transportSynced) {
+					if (previousTransport === undefined) {
+						delete currentConfig['传输协议'];
+					} else {
+						currentConfig['传输协议'] = previousTransport;
+					}
+				}
+				showToast('😢 ' + error.message + '，请检测网络环境，或关闭代理后再试！', 'error');
+			} finally {
+				xmuxSaving = false;
+				setXmuxButtonsBusy(false);
+			}
+		}
+
+		// 还原默认参数：只把默认值填进表单，不落盘 —— 由用户自己决定「保存」还是「取消」
+		function resetXmuxDefaults() {
+			if (xmuxSaving) return;
+			XMUX_FIELD_KEYS.forEach((key) => {
+				const meta = XMUX_FIELD_META[key];
+				clearXmuxConflictHighlight(getXmuxFieldElement(key));
+				setXmuxFieldError(key, '');
+				const input = document.getElementById(meta.inputId);
+				if (!input) return;
+				input.value = String(XMUX_DEFAULT_VALUES[key] === undefined ? 0 : XMUX_DEFAULT_VALUES[key]);
+			});
+			showToast('已填入默认参数，点击「保存」后才会生效', 'info');
+		}
+
 		// HOSTS 编辑模态框相关函数
 		function openHostsEditModal(event) {
 			if (event) event.stopPropagation();
@@ -22172,6 +24263,9 @@
 				}
 
 				if (currentConfig.ECHConfig?.SNI !== undefined) {
+					// 保存前兜底：输入框可能没触发 change（如脚本直接调保存），统一清洗为纯域名
+					const sniInputEl = document.getElementById('echSNIInput');
+					if (sniInputEl) setEchSNIFieldValue(sniInputEl.value, { normalize: true, skipMarkModified: true });
 					const sniValue = document.getElementById('echSNIValue').value;
 					currentConfig.ECHConfig.SNI = sniValue === '' ? null : sniValue;
 				}
@@ -22206,6 +24300,15 @@
 				}
 			}
 
+			// 保存连接复用「启用」状态（仅当字段存在且版本支持时写入，避免低版本后端写入无意义字段）
+			if (xmuxFeatureEnabled) {
+				const xmuxConfig = getXmuxConfig();
+				const xmuxEnabledCheckbox = document.getElementById('xmuxEnabled');
+				if (xmuxConfig && xmuxEnabledCheckbox) {
+					xmuxConfig['启用'] = !!xmuxEnabledCheckbox.checked;
+				}
+			}
+
 			await saveConfigToServer('config');
 			// 更新网页标题
 			document.title = `${currentConfig.优选订阅生成?.SUBNAME || 'edgetunnel'}设置页面 - 管理后台`;
@@ -22231,6 +24334,9 @@
 
 				// 保存ECHConfig.SNI（如果存在）
 				if (currentConfig.ECHConfig?.SNI !== undefined) {
+					// 保存前兜底：输入框可能没触发 change，统一清洗为纯域名
+					const sniInputEl = document.getElementById('echSNIInput');
+					if (sniInputEl) setEchSNIFieldValue(sniInputEl.value, { normalize: true, skipMarkModified: true });
 					const sniValue = document.getElementById('echSNIValue').value;
 					currentConfig.ECHConfig.SNI = sniValue === '' ? null : sniValue;
 				}
@@ -27322,6 +29428,7 @@
 					updateProtocol();
 					syncFingerprintSelectFromConfig();
 					syncALPNSelectFromConfig();
+					syncXmuxFromConfig();
 				} else if (section === 'proxy') {
 					applyProxyConfigToForm();
 				} else if (section === 'convert') {
@@ -28069,6 +30176,10 @@
 			}
 			initNodeUUIDEasterEgg();
 			initVersionCopyEasterEgg();
+			// PROXYIP 预设下拉（自绘面板）：绑定开合/选中/键盘导航
+			initProxyIPPresetPicker();
+			// ECH 的两个预设下拉（与 PROXYIP 同款自绘面板）：渲染条目并绑定开合/选中/键盘导航
+			initEchPresetPickers();
 			// 按协议注册表生成公开库的协议胶囊（新增协议后无需改 HTML）
 			renderChainLibProtocols();
 			// 独立预加载 SubConfig 数据，不阻塞主流程
@@ -29780,172 +31891,6 @@
 			document.addEventListener('keydown', escHandler);
 		}
 
-		// ==================== 获取更多 PROXYIP 相关函数 ====================
-
-		function showGetMoreProxyIPModal() {
-			showExploreProxyModal('proxyip');
-			// 重置已选
-			selectedProxyIPs = [];
-			updateSelectedProxyIPsUI();
-		}
-
-		function closeGetMoreProxyIPModal(event) {
-			closeExploreProxyModal('proxyip', event);
-		}
-
-		function onProxyIPDataRegionChange() {
-			onProxyRegionChange('proxyip');
-		}
-
-		async function verifySingleProxyIP(proxy, signal) {
-			const config = proxyConfigs['proxyip'];
-			const proxyIp = proxy.proxy; // format: ip
-
-			if (signal && signal.aborted) return;
-
-			// 设置15秒超时
-			const timeoutId = setTimeout(() => {
-				window[config.verificationStatus][proxyIp] = {
-					status: 'timeout',
-					responseTime: null
-				};
-				updateProxyDisplay('proxyip');
-			}, 10000);
-
-			window[config.verificationTimeouts][proxyIp] = timeoutId;
-
-			try {
-				const response = await fetch(`https://api.check.proxyip.cmliussss.net/check?proxyip=${proxyIp}`, { signal });
-				clearTimeout(window[config.verificationTimeouts][proxyIp]);
-
-				if (response.ok) {
-					const data = await response.json();
-					if (data.success) {
-						window[config.verificationStatus][proxyIp] = {
-							status: 'success',
-							responseTime: data.responseTime,
-							supports_ipv4: data.supports_ipv4 === true,
-							supports_ipv6: data.supports_ipv6 === true
-						};
-					} else {
-						window[config.verificationStatus][proxyIp] = {
-							status: 'failed',
-							responseTime: null
-						};
-					}
-				} else {
-					window[config.verificationStatus][proxyIp] = {
-						status: 'failed',
-						responseTime: null
-					};
-				}
-			} catch (error) {
-				if (signal && signal.aborted) return;
-				window[config.verificationStatus][proxyIp] = {
-					status: 'failed',
-					responseTime: null
-				};
-			}
-			updateProxyDisplay('proxyip');
-		}
-
-		function addSelectedProxyIP() {
-			const select = document.getElementById('proxyIPProxySelect');
-			const ip = select.value;
-			if (!ip) return;
-
-			if (selectedProxyIPs.length >= 8) {
-				showToast('最多只能选择 8 个 ProxyIP', 'warning');
-				return;
-			}
-
-			if (selectedProxyIPs.includes(ip)) {
-				showToast('该 IP 已在选择列表中', 'warning');
-				return;
-			}
-
-			selectedProxyIPs.push(ip);
-			updateSelectedProxyIPsUI();
-			updateProxyIPConfirmButton();
-		}
-
-		function removeSelectedProxyIP(ip) {
-			selectedProxyIPs = selectedProxyIPs.filter(item => item !== ip);
-			updateSelectedProxyIPsUI();
-			updateProxyIPConfirmButton();
-		}
-
-		function updateSelectedProxyIPsUI() {
-			const container = document.getElementById('selectedProxyIPsContainer');
-			container.innerHTML = '';
-
-			selectedProxyIPs.forEach(ip => {
-				// 查找对应的国家 emoji
-				const dataList = window.proxyIPListData || [];
-				const proxyData = dataList.find(p => p.ip === ip);
-				const emoji = proxyData?.country_emoji || '🌐';
-
-				// 构建 title 信息
-				let titleText = '';
-				if (proxyData) {
-					const city = proxyData.city || '未知';
-					const country = proxyData.country || '未知';
-					const countryName = proxyData.country_cn || '未知';
-					const clientIp = proxyData.clientIp || ip;
-					const asn = proxyData.asn || '未知';
-					const asOrganization = proxyData.asOrganization || '未知';
-
-					titleText = `${city}\n国家: [${country}]${countryName}\n落地IP: ${clientIp}\nASN: ${asn}\n运营商: ${asOrganization}`;
-				}
-
-				const tag = document.createElement('div');
-				tag.style.cssText = 'background: #fee2e2; border: 1px solid #ef4444; color: #b91c1c; padding: 4px 10px; border-radius: 9999px; display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500;';
-				if (titleText) {
-					tag.title = titleText;
-				}
-				tag.innerHTML = `
-					<span>${emoji} ${ip}</span>
-					<span onclick="removeSelectedProxyIP('${ip}')" style="cursor: pointer; font-weight: bold; font-size: 16px;">×</span>
-				`;
-				container.appendChild(tag);
-			});
-		}
-
-		function updateProxyIPConfirmButton() {
-			const btn = document.getElementById('proxyIPConfirmBtn');
-			btn.disabled = selectedProxyIPs.length === 0;
-		}
-
-		function confirmSelectProxyIP() {
-			const input = document.getElementById('proxyIP');
-			if (input) {
-				input.value = selectedProxyIPs.join(',');
-				input.dispatchEvent(new Event('change', { bubbles: true }));
-				markModified('proxy');
-			}
-
-			closeGetMoreProxyIPModal();
-
-			// 如果勾选了自动获取，取消勾选
-			const autoProxyCheck = document.getElementById('autoProxy');
-			if (autoProxyCheck && autoProxyCheck.checked) {
-				autoProxyCheck.checked = false;
-				if (typeof toggleAutoProxy === 'function') toggleAutoProxy();
-			}
-
-			const config = proxyConfigs['proxyip'];
-			if (config.abortController) {
-				config.abortController.abort();
-				config.abortController = null;
-			}
-
-			// 亮起保存和取消按钮
-			const saveBtn = document.getElementById('saveProxyBtn');
-			const cancelBtn = document.getElementById('cancelProxyBtn');
-			if (saveBtn) saveBtn.disabled = false;
-			if (cancelBtn) cancelBtn.disabled = false;
-		}
-
 		// ==================== SOCKS5 相关函数 ====================
 
 		// 代理类型配置
@@ -29997,22 +31942,6 @@
 				inputId: 'httpsAddr',
 				abortController: null,
 				verifySingleFunction: (proxy, signal) => verifySingleProxy(proxy, 'https', signal)
-			},
-			proxyip: {
-				modalId: 'getMoreProxyIPModal',
-				regionSelectId: 'proxyIPDataRegionSelect',
-				proxySelectId: 'proxyIPProxySelect',
-				proxySelectGroupId: 'proxyIPProxySelectGroup',
-				confirmBtnId: 'proxyIPConfirmBtn',
-				listData: 'proxyIPListData',
-				countryMap: 'proxyIPCountryMap',
-				verificationStatus: 'proxyIPVerificationStatus',
-				verificationTimeouts: 'proxyIPVerificationTimeouts',
-				url: 'https://zip.cm.edu.kg.cmliussss.net/all.json',
-				description: 'ProxyIP列表',
-				inputId: 'proxyIP',
-				abortController: null,
-				verifySingleFunction: (proxy, signal) => verifySingleProxyIP(proxy, signal)
 			}
 		};
 
@@ -30071,13 +32000,6 @@
 		let socks5CountryMap = {};
 		let socks5VerificationStatus = {}; // 存储验证状态
 		let socks5VerificationTimeouts = {}; // 存储超时计时器
-
-		// 存储 ProxyIP 数据
-		let proxyIPListData = [];
-		let proxyIPCountryMap = {};
-		let proxyIPVerificationStatus = {};
-		let proxyIPVerificationTimeouts = {};
-		let selectedProxyIPs = []; // 存储用户选择的 ProxyIP
 
 		function showExploreSocks5Modal() {
 			showExploreProxyModal('socks5');
@@ -30182,22 +32104,7 @@
 				let statusText = '验证中';
 
 				if (status.status === 'success') {
-					if (type === 'proxyip') {
-						const supportsV4 = status.supports_ipv4 === true;
-						const supportsV6 = status.supports_ipv6 === true;
-
-						if (supportsV4 && supportsV6) {
-							emoji = '✅✅';
-						} else if (supportsV4 && !supportsV6) {
-							emoji = '✅🔴';
-						} else if (!supportsV4 && supportsV6) {
-							emoji = '🔴✅';
-						} else {
-							emoji = '🔴🔴';
-						}
-					} else {
-						emoji = '✅';
-					}
+					emoji = '✅';
 					statusText = `${status.responseTime}ms`;
 				} else if (status.status === 'timeout') {
 					emoji = '🔴';
@@ -30213,18 +32120,14 @@
 					? configForLabel.formatProxyOptionLabel(proxy, status, { emoji, statusText, type })
 					: '';
 
-				// ProxyIP 模式下 label 稍微不同，不包含协议前缀
-				const label = customLabel || (type === 'proxyip'
-					? `${emoji}[${statusText}]${proxy.ip}${proxy.city ? ` - ${proxy.city}` : ''},AS${proxy.asn}`
-					: `${emoji}[${statusText}]${proxy.city},AS${proxy.asn},${proxy.asOrganization}`);
+				const label = customLabel || `${emoji}[${statusText}]${proxy.city},AS${proxy.asn},${proxy.asOrganization}`;
 
 				const disabled = !isSelectable || status.status !== 'success';
-				// ProxyIP 不需要默认选中，因为是多选触发
-				const selected = type !== 'proxyip' && isSelectable && status.status === 'success' && successfulProxies.indexOf(proxy) === 0 ? 'selected' : '';
+				const selected = isSelectable && status.status === 'success' && successfulProxies.indexOf(proxy) === 0 ? 'selected' : '';
 				return `<option value="${proxy.proxy}" ${disabled ? 'disabled' : ''} ${selected}>${label}</option>`;
 			}
 
-			let html = type === 'proxyip' ? '<option value="">-- 请选择代理 --</option>' : '';
+			let html = '';
 			if (successfulProxies.length > 0) {
 				// 有成功的代理，显示所有代理
 				sortedProxies.forEach(proxy => {
@@ -30235,7 +32138,7 @@
 				html = '<option value="">很抱歉，当前地区无可用代理，请切换其他地区。</option>';
 			} else {
 				// 验证中，显示代理列表
-				html = (type === 'proxyip' ? '<option value="">正在验证可用性，请稍候...</option>' : '<option value="">正在验证可用性，请稍候...</option>');
+				html = '<option value="">正在验证可用性，请稍候...</option>';
 				sortedProxies.forEach(proxy => {
 					html += generateProxyOption(proxy, false);
 				});
@@ -30243,11 +32146,11 @@
 
 			select.innerHTML = html;
 
-			// 恢复用户的选择 (ProxyIP 模式下如果当前选中的仍然有效，也恢复)
+			// 恢复用户的选择
 			if (successfulProxies.length > 0) {
 				if (currentValue && successfulProxies.some(p => p.proxy === currentValue)) {
 					select.value = currentValue;
-				} else if (type !== 'proxyip') {
+				} else {
 					select.value = successfulProxies[0].proxy;
 				}
 			}
@@ -30330,15 +32233,13 @@
 		const lastMappedProxy = {
 			socks5: null,
 			http: null,
-			https: null,
-			proxyip: null
+			https: null
 		};
 
 		const proxyMaps = {
 			socks5: { map: null, marker: null },
 			http: { map: null, marker: null },
-			https: { map: null, marker: null },
-			proxyip: { map: null, marker: null }
+			https: { map: null, marker: null }
 		};
 
 		function initProxyMap(type) {
@@ -30348,8 +32249,8 @@
 				if (window.__cdnLibs) window.__cdnLibs.ready.then(function () { if (window.L) initProxyMap(type); });
 				return;
 			}
-			const containerId = type === 'socks5' ? 'proxy-map-socks5' : (type === 'http' ? 'proxy-map-http' : (type === 'https' ? 'proxy-map-https' : 'proxy-map-proxyip'));
-			const container = document.getElementById(containerId);
+			const containerId = type === 'socks5' ? 'proxy-map-socks5' : (type === 'http' ? 'proxy-map-http' : (type === 'https' ? 'proxy-map-https' : null));
+			const container = containerId ? document.getElementById(containerId) : null;
 			if (!container) return;
 
 			// 如果地图已存在，先刷新布局
@@ -30474,26 +32375,6 @@
 			fetchWithAutoMirror(url, config.description)
 				.then(text => {
 					let data = JSON.parse(text);
-					if (type === 'proxyip') {
-						// all.json format has a 'data' array
-						data = data.data.filter(item =>
-							Array.isArray(item.port) ? item.port.includes(443) : item.port === 443
-						).map(item => ({
-							proxy: item.ip,
-							ip: item.ip,
-							country: item.meta?.country || 'Unknown',
-							country_cn: item.meta?.country_cn || '未知',
-							country_en: item.meta?.country_en || 'Unknown',
-							country_emoji: item.meta?.country_emoji || '🏳️',
-							city: item.meta?.city || '未知',
-							clientIp: item.meta?.clientIp || item.ip,
-							asn: item.meta?.asn || 0,
-							asOrganization: item.meta?.asOrganization || '未知',
-							continent: item.meta?.continent || 'Unknown',
-							latitude: item.meta?.latitude !== undefined ? item.meta.latitude : (item.meta?.colo?.lat !== undefined ? item.meta.colo.lat : null),
-							longitude: item.meta?.longitude !== undefined ? item.meta.longitude : (item.meta?.colo?.lon !== undefined ? item.meta.colo.lon : null)
-						}));
-					}
 					window[config.listData] = data;
 					window[config.countryMap] = buildCountryMap(window[config.listData], window[config.countryMap]);
 					populateProxyRegionSelect(type);
@@ -30627,7 +32508,6 @@
 			socks5: { lastUpdate: 0, pending: false, timer: null, selectOpen: false, listenersAdded: false },
 			http: { lastUpdate: 0, pending: false, timer: null, selectOpen: false, listenersAdded: false },
 			https: { lastUpdate: 0, pending: false, timer: null, selectOpen: false, listenersAdded: false },
-			proxyip: { lastUpdate: 0, pending: false, timer: null, selectOpen: false, listenersAdded: false },
 			chain_socks5: { lastUpdate: 0, pending: false, timer: null, selectOpen: false, listenersAdded: false },
 			chain_http: { lastUpdate: 0, pending: false, timer: null, selectOpen: false, listenersAdded: false },
 			chain_https: { lastUpdate: 0, pending: false, timer: null, selectOpen: false, listenersAdded: false },
